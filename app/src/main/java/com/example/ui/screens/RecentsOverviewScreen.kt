@@ -63,8 +63,10 @@ import com.example.ui.components.AppIconBadge
 fun RecentsOverviewScreen(
     settings: LauncherSettings,
     recentApps: List<AppItem>,
+    memoryInfo: String,
     onClose: () -> Unit,
     onAppClick: (AppItem) -> Unit,
+    onKillProcess: (String) -> Unit,
     onShowToast: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -117,7 +119,7 @@ fun RecentsOverviewScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "RAM: 3.8 GB / 8.0 GB available",
+                                text = if (memoryInfo.isNotBlank()) memoryInfo else "RAM: 3.8 GB / 8.0 GB available",
                                 color = Color.White.copy(alpha = 0.9f),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
@@ -158,7 +160,10 @@ fun RecentsOverviewScreen(
                             app = app,
                             onLaunch = { onAppClick(app) },
                             onDismiss = {
-                                taskList.removeAt(index)
+                                val removed = taskList.removeAt(index)
+                                if (settings.recentsKillApp) {
+                                    onKillProcess(removed.packageName)
+                                }
                                 if (settings.actionToasts) {
                                     onShowToast("Cleared ${app.label}")
                                 }

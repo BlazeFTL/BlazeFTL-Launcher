@@ -1,6 +1,11 @@
 package com.example
 
+import android.content.Context
 import android.content.Intent
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -18,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,6 +34,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.data.AppRepository
 import com.example.data.LauncherPreferencesRepository
@@ -47,6 +54,7 @@ import com.example.ui.screens.RecentsSettingsScreen
 import com.example.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.sqrt
 
 class MainActivity : ComponentActivity() {
 
@@ -84,12 +92,15 @@ fun SparkLauncherApp(
     appRepo: AppRepository,
     onOpenSystemSettings: () -> Unit
 ) {
+    val context = LocalContext.current
     val settings by prefsRepo.settings.collectAsState()
     var currentScreen by remember { mutableStateOf(LauncherScreen.HOME) }
     var installedApps by remember { mutableStateOf<List<AppItem>>(emptyList()) }
     val dockApps = remember { appRepo.getDockApps() }
-    val homeScreenApps = remember { appRepo.getHomeScreenApps() }
+    
+    val homeAppsList = remember { mutableStateListOf<AppItem>() }
 
+    var memoryInfoText by remember { mutableStateOf("") }
     var toastMessage by remember { mutableStateOf("") }
     var isToastVisible by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -103,8 +114,89 @@ fun SparkLauncherApp(
         }
     }
 
+    // Refresh installed apps and sync home screen items
     LaunchedEffect(Unit) {
-        installedApps = appRepo.getInstalledApps()
+        val loaded = appRepo.getInstalledApps()
+        installedApps = loaded
+
+        val savedPackages = prefsRepo.getHomeScreenPackages()
+        if (savedPackages != null && savedPackages.isNotEmpty()) {
+            val appMap = loaded.associateBy { it.packageName }
+            val restored = savedPackages.mapNotNull { appMap[it] }
+            homeAppsList.clear()
+            if (restored.isNotEmpty()) {
+                homeAppsList.addAll(restored)
+            } else {
+                homeAppsList.addAll(appRepo.getHomeScreenApps())
+            }
+        } else {
+            homeAppsList.clear()
+            homeAppsList.addAll(appRepo.getHomeScreenApps())
+        }
+
+        memoryInfoText = appRepo.getFormattedMemoryInfo()
+    }
+
+    // Shake Sensor Detection
+    DisposableEffect(settings.shakeGestureAction, settings.shakeGestureIntensity, currentScreen) {
+        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        val accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        var lastShakeTime = 0L
+
+        val threshold = when (settings.shakeGestureIntensity) {
+            0 -> 18f // Light
+            1 -> 24f // Medium
+            2 -> 30f // Strong
+            else -> 24f
+        }
+
+        val listener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                if (event == null) return
+                val x = event.values[0]
+                val y = event.values[1]
+                val z = event.values[2]
+                val acceleration = sqrt((x * x + y * y + z * z).toDouble()).toFloat()
+
+                val now = System.currentTimeMillis()
+                if (acceleration > threshold && now - lastShakeTime > 1500L) {
+                    lastShakeTime = now
+                    appRepo.triggerHapticFeedback(settings.launcherVibrationIntensity)
+
+                    if (currentScreen == LauncherScreen.RECENTS_OVERVIEW && settings.recentsShakeToClearAll) {
+                        showToast("Recents cleared by shake gesture")
+                    } else if (currentScreen == LauncherScreen.HOME) {
+                        when (settings.shakeGestureAction) {
+                            1 -> {
+                                currentScreen = LauncherScreen.APP_DRAWER
+                                if (settings.actionToasts) showToast("Opened App Drawer (Shake)")
+                            }
+                            2 -> {
+                                currentScreen = LauncherScreen.RECENTS_OVERVIEW
+                                if (settings.actionToasts) showToast("Opened Recents (Shake)")
+                            }
+                            3 -> {
+                                currentScreen = LauncherScreen.SETTINGS_MAIN
+                                if (settings.actionToasts) showToast("Opened Settings (Shake)")
+                            }
+                            4 -> {
+                                if (settings.actionToasts) showToast("Screen locked (Shake)")
+                            }
+                        }
+                    }
+                }
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+
+        accelerometer?.let {
+            sensorManager.registerListener(listener, it, SensorManager.SENSOR_DELAY_UI)
+        }
+
+        onDispose {
+            sensorManager?.unregisterListener(listener)
+        }
     }
 
     // Back handling
@@ -124,6 +216,9 @@ fun SparkLauncherApp(
     }
 
     fun handleAppClick(app: AppItem) {
+        if (settings.enableHapticOnRecents) {
+            appRepo.triggerHapticFeedback(settings.launcherVibrationIntensity)
+        }
         if (app.packageName == "com.android.settings") {
             currentScreen = LauncherScreen.SETTINGS_MAIN
             return
@@ -131,6 +226,26 @@ fun SparkLauncherApp(
         val launched = appRepo.launchApp(app.packageName)
         if (!launched) {
             showToast("Opening ${app.label}")
+        }
+    }
+
+    fun addAppToHomeScreen(packageName: String) {
+        val app = installedApps.find { it.packageName == packageName } ?: return
+        if (!homeAppsList.any { it.packageName == packageName }) {
+            homeAppsList.add(app)
+            prefsRepo.saveHomeScreenPackages(homeAppsList.map { it.packageName })
+            showToast("Added ${app.label} to Home Screen")
+        } else {
+            showToast("${app.label} is already on Home Screen")
+        }
+    }
+
+    fun removeAppFromHomeScreen(packageName: String) {
+        val index = homeAppsList.indexOfFirst { it.packageName == packageName }
+        if (index != -1) {
+            val removed = homeAppsList.removeAt(index)
+            prefsRepo.saveHomeScreenPackages(homeAppsList.map { it.packageName })
+            showToast("Removed ${removed.label} from Home Screen")
         }
     }
 
@@ -155,20 +270,30 @@ fun SparkLauncherApp(
                 LauncherScreen.HOME -> {
                     HomeScreen(
                         settings = settings,
-                        homeApps = homeScreenApps,
+                        homeApps = homeAppsList,
                         dockApps = dockApps,
                         onAppClick = { handleAppClick(it) },
                         onOpenDrawer = { currentScreen = LauncherScreen.APP_DRAWER },
-                        onOpenRecents = { currentScreen = LauncherScreen.RECENTS_OVERVIEW },
+                        onOpenRecents = {
+                            memoryInfoText = appRepo.getFormattedMemoryInfo()
+                            currentScreen = LauncherScreen.RECENTS_OVERVIEW
+                        },
                         onOpenSettings = { currentScreen = LauncherScreen.SETTINGS_MAIN },
+                        onOpenWallpaper = { appRepo.openWallpaperPicker() },
+                        onOpenAppInfo = { appRepo.openAppInfo(it) },
+                        onUninstallApp = { appRepo.uninstallApp(it) },
+                        onRemoveFromHome = { removeAppFromHomeScreen(it) },
                         onShowToast = { showToast(it) }
                     )
                 }
                 LauncherScreen.APP_DRAWER -> {
                     AppDrawerScreen(
                         settings = settings,
-                        allApps = if (installedApps.isNotEmpty()) installedApps else homeScreenApps,
+                        allApps = if (installedApps.isNotEmpty()) installedApps else homeAppsList,
                         onAppClick = { handleAppClick(it) },
+                        onAddToHome = { addAppToHomeScreen(it) },
+                        onOpenAppInfo = { appRepo.openAppInfo(it) },
+                        onUninstallApp = { appRepo.uninstallApp(it) },
                         onCloseDrawer = { currentScreen = LauncherScreen.HOME },
                         onShowToast = { showToast(it) }
                     )
@@ -176,9 +301,11 @@ fun SparkLauncherApp(
                 LauncherScreen.RECENTS_OVERVIEW -> {
                     RecentsOverviewScreen(
                         settings = settings,
-                        recentApps = homeScreenApps.take(6),
+                        recentApps = if (homeAppsList.isNotEmpty()) homeAppsList.take(6) else appRepo.getHomeScreenApps().take(6),
+                        memoryInfo = memoryInfoText,
                         onClose = { currentScreen = LauncherScreen.HOME },
                         onAppClick = { handleAppClick(it) },
+                        onKillProcess = { appRepo.killBackgroundProcesses(it) },
                         onShowToast = { showToast(it) }
                     )
                 }

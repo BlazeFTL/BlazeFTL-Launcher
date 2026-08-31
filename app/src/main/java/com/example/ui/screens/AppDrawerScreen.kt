@@ -4,6 +4,18 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -75,11 +87,15 @@ fun AppDrawerScreen(
     settings: LauncherSettings,
     allApps: List<AppItem>,
     onAppClick: (AppItem) -> Unit,
+    onAddToHome: (String) -> Unit,
+    onOpenAppInfo: (String) -> Unit,
+    onUninstallApp: (String) -> Unit,
     onCloseDrawer: () -> Unit,
     onShowToast: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    var selectedAppForPopup by remember { mutableStateOf<AppItem?>(null) }
     val focusManager = LocalFocusManager.current
 
     val filteredApps = remember(searchQuery, allApps) {
@@ -94,8 +110,23 @@ fun AppDrawerScreen(
     }
 
     val overlayAlpha = (settings.drawerBackgroundOpacity / 100f).coerceIn(0.2f, 0.95f)
+    var totalDragY by remember { mutableStateOf(0f) }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .draggable(
+                state = rememberDraggableState { delta ->
+                    totalDragY += delta
+                    if (totalDragY > 80f) {
+                        totalDragY = 0f
+                        onCloseDrawer()
+                    }
+                },
+                orientation = Orientation.Vertical,
+                onDragStopped = { totalDragY = 0f }
+            )
+    ) {
         // Wallpaper underneath
         Image(
             painter = painterResource(id = R.drawable.img_astronaut_wallpaper),
@@ -259,7 +290,8 @@ fun AppDrawerScreen(
                         showLabel = settings.iconLabelsInDrawer,
                         maxLines = settings.maxLabelLines,
                         forceMonochrome = settings.forceMonochrome && settings.themedIconsInDrawer,
-                        onClick = { onAppClick(app) }
+                        onClick = { onAppClick(app) },
+                        onLongClick = { selectedAppForPopup = app }
                     )
                 }
             }
@@ -282,6 +314,97 @@ fun AppDrawerScreen(
                 }
             }
         }
+
+        // App Item Long Press Popup
+        if (selectedAppForPopup != null) {
+            val app = selectedAppForPopup!!
+            Dialog(onDismissRequest = { selectedAppForPopup = null }) {
+                Card(
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    modifier = Modifier.fillMaxWidth(0.88f)
+                ) {
+                    Column(modifier = Modifier.padding(18.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AppIconBadge(app = app, sizeDp = 40.dp)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = app.label,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF231F20)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    selectedAppForPopup = null
+                                    onAppClick(app)
+                                }
+                                .padding(vertical = 12.dp, horizontal = 8.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.GridView, contentDescription = null, tint = Color(0xFF382F2D), modifier = Modifier.size(22.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(text = "Open App", fontSize = 16.sp, color = Color(0xFF231F20))
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    selectedAppForPopup = null
+                                    onAddToHome(app.packageName)
+                                }
+                                .padding(vertical = 12.dp, horizontal = 8.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = Color(0xFF382F2D), modifier = Modifier.size(22.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(text = "Add to Home Screen", fontSize = 16.sp, color = Color(0xFF231F20))
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    selectedAppForPopup = null
+                                    onOpenAppInfo(app.packageName)
+                                }
+                                .padding(vertical = 12.dp, horizontal = 8.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Info, contentDescription = null, tint = Color(0xFF382F2D), modifier = Modifier.size(22.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(text = "App info", fontSize = 16.sp, color = Color(0xFF231F20))
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    selectedAppForPopup = null
+                                    onUninstallApp(app.packageName)
+                                }
+                                .padding(vertical = 12.dp, horizontal = 8.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Delete, contentDescription = null, tint = Color(0xFF382F2D), modifier = Modifier.size(22.dp))
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(text = "Uninstall", fontSize = 16.sp, color = Color(0xFF231F20))
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -294,13 +417,19 @@ fun DrawerAppItemView(
     maxLines: Int,
     forceMonochrome: Boolean,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .clickable { onClick() }
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { onClick() },
+                    onLongPress = { onLongClick() }
+                )
+            }
             .padding(vertical = 4.dp)
     ) {
         AppIconBadge(

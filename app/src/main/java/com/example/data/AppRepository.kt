@@ -1,8 +1,17 @@
 package com.example.data
 
+import android.app.ActivityManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import java.util.Locale
+import android.provider.Settings
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.CameraAlt
@@ -175,11 +184,20 @@ class AppRepository(private val context: Context) {
         )
     }
 
-    fun launchApp(packageName: String): Boolean {
+    fun launchApp(packageName: String, activityName: String? = null): Boolean {
         return try {
-            val intent = context.packageManager.getLaunchIntentForPackage(packageName)
+            val intent = if (!activityName.isNullOrBlank()) {
+                Intent(Intent.ACTION_MAIN).apply {
+                    addCategory(Intent.CATEGORY_LAUNCHER)
+                    component = ComponentName(packageName, activityName)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                }
+            } else {
+                context.packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                }
+            }
             if (intent != null) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 context.startActivity(intent)
                 true
             } else {
@@ -187,6 +205,100 @@ class AppRepository(private val context: Context) {
             }
         } catch (e: Exception) {
             false
+        }
+    }
+
+    fun openAppInfo(packageName: String): Boolean {
+        return try {
+            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun uninstallApp(packageName: String): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_DELETE).apply {
+                data = Uri.fromParts("package", packageName, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun openWallpaperPicker(): Boolean {
+        return try {
+            val intent = Intent(Intent.ACTION_SET_WALLPAPER).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun getSystemMemoryInfo(): Pair<Long, Long> {
+        return try {
+            val actManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            if (actManager != null) {
+                val memInfo = ActivityManager.MemoryInfo()
+                actManager.getMemoryInfo(memInfo)
+                val availMb = memInfo.availMem / (1024 * 1024)
+                val totalMb = memInfo.totalMem / (1024 * 1024)
+                Pair(availMb, totalMb)
+            } else {
+                Pair(3840L, 8192L)
+            }
+        } catch (e: Exception) {
+            Pair(3840L, 8192L)
+        }
+    }
+
+    fun getFormattedMemoryInfo(): String {
+        val (availMb, totalMb) = getSystemMemoryInfo()
+        val availGb = String.format(Locale.US, "%.1f", availMb / 1024f)
+        val totalGb = String.format(Locale.US, "%.1f", totalMb / 1024f)
+        return "RAM: $availGb GB / $totalGb GB available"
+    }
+
+    fun killBackgroundProcesses(packageName: String) {
+        try {
+            val actManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            actManager?.killBackgroundProcesses(packageName)
+        } catch (e: Exception) {
+            // Ignored
+        }
+    }
+
+    fun triggerHapticFeedback(intensity: Int = 1) {
+        try {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vibratorManager?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+            if (vibrator != null && vibrator.hasVibrator()) {
+                val duration = (intensity * 25L).coerceIn(20L, 100L)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(duration)
+                }
+            }
+        } catch (e: Exception) {
+            // Ignored
         }
     }
 }

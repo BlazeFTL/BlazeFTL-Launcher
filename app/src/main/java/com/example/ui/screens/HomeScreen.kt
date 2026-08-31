@@ -27,7 +27,13 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MusicNote
@@ -79,6 +85,10 @@ fun HomeScreen(
     onOpenDrawer: () -> Unit,
     onOpenRecents: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenWallpaper: () -> Unit,
+    onOpenAppInfo: (String) -> Unit,
+    onUninstallApp: (String) -> Unit,
+    onRemoveFromHome: (String) -> Unit,
     onShowToast: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -93,9 +103,22 @@ fun HomeScreen(
         "Nightcall (Synthwave)" to "Kavinsky"
     )
 
+    var totalDragY by remember { mutableStateOf(0f) }
+
     Box(
         modifier = modifier
             .fillMaxSize()
+            .draggable(
+                state = rememberDraggableState { delta ->
+                    totalDragY += delta
+                    if (totalDragY < -80f) {
+                        totalDragY = 0f
+                        onOpenDrawer()
+                    }
+                },
+                orientation = Orientation.Vertical,
+                onDragStopped = { totalDragY = 0f }
+            )
             .pointerInput(Unit) {
                 detectTapGestures(
                     onLongPress = {
@@ -103,7 +126,7 @@ fun HomeScreen(
                     },
                     onDoubleTap = {
                         if (settings.doubleTapToSleep) {
-                            onShowToast("Double tap: Screen off")
+                            onShowToast("Double tap: Screen locked")
                         }
                     }
                 )
@@ -216,6 +239,10 @@ fun HomeScreen(
                     showDesktopMenu = false
                     onOpenSettings()
                 },
+                onOpenWallpaper = {
+                    showDesktopMenu = false
+                    onOpenWallpaper()
+                },
                 onShowToast = onShowToast
             )
         }
@@ -229,6 +256,18 @@ fun HomeScreen(
                 onOpenApp = {
                     selectedAppForPopup = null
                     onAppClick(app)
+                },
+                onOpenAppInfo = {
+                    selectedAppForPopup = null
+                    onOpenAppInfo(app.packageName)
+                },
+                onUninstallApp = {
+                    selectedAppForPopup = null
+                    onUninstallApp(app.packageName)
+                },
+                onRemoveFromHome = {
+                    selectedAppForPopup = null
+                    onRemoveFromHome(app.packageName)
                 },
                 onShowToast = onShowToast
             )
@@ -480,6 +519,7 @@ fun DockSearchBar(
 fun DesktopContextMenu(
     onDismiss: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenWallpaper: () -> Unit,
     onShowToast: (String) -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -506,10 +546,7 @@ fun DesktopContextMenu(
                 ContextMenuItem(
                     icon = Icons.Default.Wallpaper,
                     label = "Wallpaper & style",
-                    onClick = {
-                        onDismiss()
-                        onShowToast("Wallpaper & Style manager")
-                    }
+                    onClick = onOpenWallpaper
                 )
                 ContextMenuItem(
                     icon = Icons.Default.Widgets,
@@ -529,6 +566,9 @@ fun AppItemContextMenu(
     app: AppItem,
     onDismiss: () -> Unit,
     onOpenApp: () -> Unit,
+    onOpenAppInfo: () -> Unit,
+    onUninstallApp: () -> Unit,
+    onRemoveFromHome: () -> Unit,
     onShowToast: (String) -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
@@ -557,20 +597,19 @@ fun AppItemContextMenu(
                     onClick = onOpenApp
                 )
                 ContextMenuItem(
-                    icon = Icons.Default.Settings,
+                    icon = Icons.Default.Info,
                     label = "App info",
-                    onClick = {
-                        onDismiss()
-                        onShowToast("${app.label}: Version 1.0 (${app.packageName})")
-                    }
+                    onClick = onOpenAppInfo
                 )
                 ContextMenuItem(
-                    icon = Icons.Default.Widgets,
-                    label = "Create shortcut",
-                    onClick = {
-                        onDismiss()
-                        onShowToast("Shortcut created on desktop")
-                    }
+                    icon = Icons.Default.RemoveCircleOutline,
+                    label = "Remove from Home",
+                    onClick = onRemoveFromHome
+                )
+                ContextMenuItem(
+                    icon = Icons.Default.Delete,
+                    label = "Uninstall",
+                    onClick = onUninstallApp
                 )
             }
         }

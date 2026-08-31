@@ -149,4 +149,13 @@ class LauncherPreferencesRepository(context: Context) {
             apply()
         }
     }
+
+    fun getHomeScreenPackages(): List<String>? {
+        val saved = prefs.getString("home_screen_packages", null) ?: return null
+        return saved.split(",").filter { it.isNotBlank() }
+    }
+
+    fun saveHomeScreenPackages(packages: List<String>) {
+        prefs.edit().putString("home_screen_packages", packages.joinToString(",")).apply()
+    }
 }

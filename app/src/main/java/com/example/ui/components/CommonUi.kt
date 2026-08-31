@@ -46,7 +46,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.model.AppItem
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ColorFilter
+import com.example.util.IconUtils
 
 val SettingsBgColor = Color(0xFFF9F1EC)
 val SettingsCardColor = Color(0xFFFFFFFF)
@@ -340,38 +342,69 @@ fun LauncherToast(
 
 @Composable
 fun AppIconBadge(
-    app: AppItem,
+    app: com.example.model.AppItem,
     sizeDp: Dp = 48.dp,
     forceMonochrome: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val bg = if (forceMonochrome) Color(0xFFE2E8F0) else Color(app.iconColor)
-    val tint = if (forceMonochrome) Color(0xFF1E293B) else Color.White
+    val realBitmap = remember(app.iconDrawable, app.packageName) {
+        IconUtils.drawableToImageBitmap(app.iconDrawable, app.packageName)
+    }
 
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = modifier
-            .size(sizeDp)
-            .background(
-                color = bg,
-                shape = CircleShape
-            )
-            .clip(CircleShape)
-    ) {
-        if (app.iconVector != null) {
-            Icon(
-                imageVector = app.iconVector,
-                contentDescription = app.label,
-                tint = tint,
-                modifier = Modifier.size(sizeDp * 0.58f)
-            )
+    if (realBitmap != null) {
+        if (forceMonochrome) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = modifier
+                    .size(sizeDp)
+                    .background(Color(0xFFE2E8F0), CircleShape)
+                    .clip(CircleShape)
+            ) {
+                Image(
+                    bitmap = realBitmap,
+                    contentDescription = app.label,
+                    colorFilter = ColorFilter.tint(Color(0xFF1E293B)),
+                    modifier = Modifier.size(sizeDp * 0.65f)
+                )
+            }
         } else {
-            Text(
-                text = app.label.take(1).uppercase(),
-                fontSize = (sizeDp.value * 0.45f).sp,
-                fontWeight = FontWeight.Bold,
-                color = tint
+            Image(
+                bitmap = realBitmap,
+                contentDescription = app.label,
+                modifier = modifier
+                    .size(sizeDp)
+                    .clip(CircleShape)
             )
+        }
+    } else {
+        val bg = if (forceMonochrome) Color(0xFFE2E8F0) else Color(app.iconColor)
+        val tint = if (forceMonochrome) Color(0xFF1E293B) else Color.White
+
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = modifier
+                .size(sizeDp)
+                .background(
+                    color = bg,
+                    shape = CircleShape
+                )
+                .clip(CircleShape)
+        ) {
+            if (app.iconVector != null) {
+                Icon(
+                    imageVector = app.iconVector,
+                    contentDescription = app.label,
+                    tint = tint,
+                    modifier = Modifier.size(sizeDp * 0.58f)
+                )
+            } else {
+                Text(
+                    text = app.label.take(1).uppercase(),
+                    fontSize = (sizeDp.value * 0.45f).sp,
+                    fontWeight = FontWeight.Bold,
+                    color = tint
+                )
+            }
         }
     }
 }
