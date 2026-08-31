@@ -76,11 +76,23 @@ import com.example.model.LauncherScreen
 import com.example.model.LauncherSettings
 import com.example.ui.components.AppIconBadge
 
+import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.WbSunny
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
+
 @Composable
 fun HomeScreen(
     settings: LauncherSettings,
     homeApps: List<AppItem>,
     dockApps: List<AppItem>,
+    isMusicPlaying: Boolean = false,
     onAppClick: (AppItem) -> Unit,
     onOpenDrawer: () -> Unit,
     onOpenRecents: () -> Unit,
@@ -89,6 +101,7 @@ fun HomeScreen(
     onOpenAppInfo: (String) -> Unit,
     onUninstallApp: (String) -> Unit,
     onRemoveFromHome: (String) -> Unit,
+    onExpandQuickSettings: () -> Unit,
     onShowToast: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -111,9 +124,12 @@ fun HomeScreen(
             .draggable(
                 state = rememberDraggableState { delta ->
                     totalDragY += delta
-                    if (totalDragY < -80f) {
+                    if (totalDragY < -70f) {
                         totalDragY = 0f
                         onOpenDrawer()
+                    } else if (totalDragY > 70f) {
+                        totalDragY = 0f
+                        onExpandQuickSettings()
                     }
                 },
                 orientation = Orientation.Vertical,
@@ -160,10 +176,15 @@ fun HomeScreen(
             if (settings.atAGlance) {
                 QuickspaceWidget(
                     settings = settings,
+                    isMusicPlaying = isMusicPlaying,
                     currentSong = songList[currentSongIndex],
                     onSongClick = {
-                        currentSongIndex = (currentSongIndex + 1) % songList.size
-                        onShowToast("Playing next: ${songList[currentSongIndex].first}")
+                        if (isMusicPlaying) {
+                            currentSongIndex = (currentSongIndex + 1) % songList.size
+                            onShowToast("Track: ${songList[currentSongIndex].first}")
+                        } else {
+                            onShowToast("Calendar & At-A-Glance")
+                        }
                     },
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp)
                 )
@@ -186,7 +207,7 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp)
                 ) {
-                    items(homeApps, key = { it.packageName }, contentType = { "desktop_app" }) { app ->
+                    items(homeApps, key = { it.uniqueKey }, contentType = { "desktop_app" }) { app ->
                         DesktopAppIcon(
                             app = app,
                             iconSizeDp = iconBaseDp,
@@ -272,10 +293,32 @@ fun HomeScreen(
 @Composable
 fun QuickspaceWidget(
     settings: LauncherSettings,
+    isMusicPlaying: Boolean,
     currentSong: Pair<String, String>,
     onSongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val dateFormat = remember { SimpleDateFormat("EEEE, MMM d", Locale.getDefault()) }
+    val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
+    var currentDateStr by remember { mutableStateOf(dateFormat.format(Date())) }
+    var currentTimeStr by remember { mutableStateOf(timeFormat.format(Date())) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            currentDateStr = dateFormat.format(Date())
+            currentTimeStr = timeFormat.format(Date())
+            delay(1000L)
+        }
+    }
+
+    val textShadow = remember {
+        Shadow(
+            color = Color.Black.copy(alpha = 0.6f),
+            offset = Offset(1f, 2f),
+            blurRadius = 4f
+        )
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -283,7 +326,8 @@ fun QuickspaceWidget(
             .clickable { onSongClick() }
             .padding(vertical = 8.dp)
     ) {
-        if (settings.nowPlaying) {
+        if (settings.nowPlaying && isMusicPlaying) {
+            // Music is actively playing
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -291,7 +335,8 @@ fun QuickspaceWidget(
                     text = "Now playing",
                     color = Color.White.copy(alpha = 0.95f),
                     fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    style = androidx.compose.ui.text.TextStyle(shadow = textShadow)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Icon(
@@ -308,14 +353,81 @@ fun QuickspaceWidget(
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                style = androidx.compose.ui.text.TextStyle(shadow = textShadow)
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = "By ${currentSong.second}",
-                color = Color.White.copy(alpha = 0.8f),
-                fontSize = 13.sp
+                color = Color.White.copy(alpha = 0.85f),
+                fontSize = 13.sp,
+                style = androidx.compose.ui.text.TextStyle(shadow = textShadow)
             )
+        } else {
+            // Default At-A-Glance: Live Date, Time & Weather Condition
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.CalendarToday,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = currentDateStr,
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    style = androidx.compose.ui.text.TextStyle(shadow = textShadow)
+                )
+                if (settings.weatherCondition) {
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "•",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(
+                        imageVector = Icons.Outlined.WbSunny,
+                        contentDescription = "Weather",
+                        tint = Color(0xFFFFD54F),
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = if (settings.detailedWeather) "24°C Sunny" else "24°C",
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        style = androidx.compose.ui.text.TextStyle(shadow = textShadow)
+                    )
+                }
+            }
+
+            if (settings.extendedStyle) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Schedule,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = currentTimeStr,
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Normal,
+                        style = androidx.compose.ui.text.TextStyle(shadow = textShadow)
+                    )
+                }
+            }
         }
     }
 }

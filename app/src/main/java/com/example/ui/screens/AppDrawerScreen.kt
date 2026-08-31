@@ -105,7 +105,7 @@ fun AppDrawerScreen(
     val focusManager = LocalFocusManager.current
 
     val filteredApps = remember(searchQuery, allApps) {
-        if (searchQuery.isBlank()) {
+        val baseList = if (searchQuery.isBlank()) {
             allApps
         } else {
             allApps.filter {
@@ -113,6 +113,7 @@ fun AppDrawerScreen(
                 it.packageName.contains(searchQuery, ignoreCase = true)
             }
         }
+        baseList.distinctBy { it.uniqueKey }
     }
 
     val overlayAlpha = (settings.drawerBackgroundOpacity / 100f).coerceIn(0.2f, 0.95f)
@@ -328,7 +329,7 @@ fun AppDrawerScreen(
             ) {
                 items(
                     items = filteredApps,
-                    key = { it.packageName },
+                    key = { it.uniqueKey },
                     contentType = { "drawer_app" }
                 ) { app ->
                     DrawerAppItemView(

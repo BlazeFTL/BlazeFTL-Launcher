@@ -76,13 +76,14 @@ class AppRepository(private val context: Context) {
             } catch (e: Exception) {
                 null
             }
-        }.sortedBy { it.label.lowercase() }
+        }.distinctBy { it.uniqueKey }
+        .sortedBy { it.label.lowercase() }
 
         if (deviceApps.isNotEmpty()) {
             deviceApps
         } else {
             // Fallback for previews
-            getCuratedApps().sortedBy { it.label.lowercase() }
+            getCuratedApps().distinctBy { it.uniqueKey }.sortedBy { it.label.lowercase() }
         }
     }
 
@@ -362,6 +363,39 @@ class AppRepository(private val context: Context) {
             actManager?.killBackgroundProcesses(packageName)
         } catch (e: Exception) {
             // Ignored
+        }
+    }
+
+    fun isAudioPlaying(): Boolean {
+        return try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
+            audioManager?.isMusicActive == true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun expandQuickSettings(): Boolean {
+        return try {
+            val statusBarService = context.getSystemService("statusbar")
+            val statusBarManager = Class.forName("android.app.StatusBarManager")
+            val method = try {
+                statusBarManager.getMethod("expandSettingsPanel")
+            } catch (e: Exception) {
+                statusBarManager.getMethod("expandNotificationsPanel")
+            }
+            method.invoke(statusBarService)
+            true
+        } catch (e: Exception) {
+            try {
+                val statusBarService = context.getSystemService("statusbar")
+                val statusBarManager = Class.forName("android.app.StatusBarManager")
+                val method = statusBarManager.getMethod("expandNotificationsPanel")
+                method.invoke(statusBarService)
+                true
+            } catch (e2: Exception) {
+                false
+            }
         }
     }
 

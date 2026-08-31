@@ -15,7 +15,9 @@ data class AppItem(
     val iconColor: Long = 0xFF4A90E2,
     val isThemed: Boolean = false,
     val category: String = "Productivity"
-)
+) {
+    val uniqueKey: String get() = if (activityName.isNotBlank()) "$packageName/$activityName" else packageName
+}
 
 data class LauncherSettings(
     // Icons

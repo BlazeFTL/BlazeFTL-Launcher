@@ -158,6 +158,15 @@ fun SparkLauncherApp(
         memoryInfoText = appRepo.getFormattedMemoryInfo()
     }
 
+    var isAudioPlaying by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            isAudioPlaying = appRepo.isAudioPlaying()
+            kotlinx.coroutines.delay(2000L)
+        }
+    }
+
     // Shake Sensor Detection
     DisposableEffect(settings.shakeGestureAction, settings.shakeGestureIntensity, currentScreen) {
         val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
@@ -275,18 +284,23 @@ fun SparkLauncherApp(
             targetState = currentScreen,
             transitionSpec = {
                 when {
-                    targetState == LauncherScreen.APP_DRAWER ->
-                        (slideInVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) { it / 3 } + fadeIn(tween(180)))
-                            .togetherWith(fadeOut(animationSpec = tween(120)))
-                    initialState == LauncherScreen.APP_DRAWER ->
-                        fadeIn(animationSpec = tween(140))
-                            .togetherWith(slideOutVertically(animationSpec = tween(180, easing = FastOutLinearInEasing)) { it / 3 } + fadeOut(tween(140)))
+                    // Home -> App Drawer: smooth upward slide & fade
+                    initialState == LauncherScreen.HOME && targetState == LauncherScreen.APP_DRAWER ->
+                        (slideInVertically(animationSpec = tween(300, easing = FastOutSlowInEasing)) { (it * 0.35f).toInt() } + fadeIn(tween(220)))
+                            .togetherWith(slideOutVertically(animationSpec = tween(240, easing = FastOutLinearInEasing)) { (-it * 0.15f).toInt() } + fadeOut(tween(180)))
+
+                    // App Drawer -> Home: smooth downward return
+                    initialState == LauncherScreen.APP_DRAWER && targetState == LauncherScreen.HOME ->
+                        (slideInVertically(animationSpec = tween(260, easing = FastOutSlowInEasing)) { (-it * 0.15f).toInt() } + fadeIn(tween(200)))
+                            .togetherWith(slideOutVertically(animationSpec = tween(280, easing = FastOutSlowInEasing)) { (it * 0.35f).toInt() } + fadeOut(tween(200)))
+
                     targetState == LauncherScreen.RECENTS_OVERVIEW || initialState == LauncherScreen.RECENTS_OVERVIEW ->
-                        (slideInHorizontally(animationSpec = tween(220)) { -it / 3 } + fadeIn(tween(180)))
-                            .togetherWith(slideOutHorizontally(animationSpec = tween(180)) { it / 3 } + fadeOut(tween(140)))
+                        (slideInHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { -it / 3 } + fadeIn(tween(200)))
+                            .togetherWith(slideOutHorizontally(animationSpec = tween(220, easing = FastOutLinearInEasing)) { it / 3 } + fadeOut(tween(160)))
+
                     else ->
-                        (slideInHorizontally(animationSpec = tween(220)) { it / 3 } + fadeIn(tween(180)))
-                            .togetherWith(slideOutHorizontally(animationSpec = tween(180)) { -it / 3 } + fadeOut(tween(140)))
+                        (slideInHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { it / 3 } + fadeIn(tween(200)))
+                            .togetherWith(slideOutHorizontally(animationSpec = tween(220, easing = FastOutLinearInEasing)) { -it / 3 } + fadeOut(tween(160)))
                 }
             },
             label = "ScreenTransition"
@@ -297,6 +311,7 @@ fun SparkLauncherApp(
                         settings = settings,
                         homeApps = homeAppsList,
                         dockApps = dockApps,
+                        isMusicPlaying = isAudioPlaying,
                         onAppClick = { handleAppClick(it) },
                         onOpenDrawer = { currentScreen = LauncherScreen.APP_DRAWER },
                         onOpenRecents = {
@@ -308,6 +323,7 @@ fun SparkLauncherApp(
                         onOpenAppInfo = { appRepo.openAppInfo(it) },
                         onUninstallApp = { appRepo.uninstallApp(it) },
                         onRemoveFromHome = { removeAppFromHomeScreen(it) },
+                        onExpandQuickSettings = { appRepo.expandQuickSettings() },
                         onShowToast = { showToast(it) }
                     )
                 }
