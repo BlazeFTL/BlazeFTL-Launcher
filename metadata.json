@@ -1,5 +1,5 @@
 {
-  "name": "Spark Launcher",
+  "name": "Blaze Launcher",
   "description": "A sleek, modern Android launcher with customizable app drawer, Quickspace At-A-Glance widget, gestures, and a beautiful light Material 3 settings UI.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

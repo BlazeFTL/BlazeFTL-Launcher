@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Spark Launcher"
+rootProject.name = "Blaze Launcher"
 
 include(":app")
