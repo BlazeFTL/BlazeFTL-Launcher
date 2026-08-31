@@ -93,7 +93,7 @@ class AppRepository(private val context: Context) {
         // 1. Phone / Dialer
         val phoneIntent = Intent(Intent.ACTION_DIAL)
         val phoneResolve = try { pm.resolveActivity(phoneIntent, PackageManager.MATCH_DEFAULT_ONLY) } catch (e: Exception) { null }
-        if (phoneResolve != null && phoneResolve.activityInfo.packageName != "android") {
+        if (phoneResolve != null && phoneResolve.activityInfo.packageName != "android" && phoneResolve.activityInfo.packageName != context.packageName) {
             try {
                 val pName = phoneResolve.activityInfo.packageName
                 val d = phoneResolve.loadIcon(pm)
@@ -110,16 +110,14 @@ class AppRepository(private val context: Context) {
                     )
                 )
             } catch (e: Exception) {
-                dockList.add(AppItem("com.google.android.dialer", label = "Phone", iconVector = Icons.Default.Phone, iconColor = 0xFF2196F3))
+                // Ignore
             }
-        } else {
-            dockList.add(AppItem("com.google.android.dialer", label = "Phone", iconVector = Icons.Default.Phone, iconColor = 0xFF2196F3))
         }
 
         // 2. Messages / SMS
         val msgIntent = Intent(Intent.ACTION_SENDTO).apply { data = Uri.parse("smsto:") }
         val msgResolve = try { pm.resolveActivity(msgIntent, PackageManager.MATCH_DEFAULT_ONLY) } catch (e: Exception) { null }
-        if (msgResolve != null && msgResolve.activityInfo.packageName != "android") {
+        if (msgResolve != null && msgResolve.activityInfo.packageName != "android" && msgResolve.activityInfo.packageName != context.packageName) {
             try {
                 val pName = msgResolve.activityInfo.packageName
                 val d = msgResolve.loadIcon(pm)
@@ -136,42 +134,41 @@ class AppRepository(private val context: Context) {
                     )
                 )
             } catch (e: Exception) {
-                dockList.add(AppItem("com.google.android.apps.messaging", label = "Messages", iconVector = Icons.Outlined.Chat, iconColor = 0xFF4CAF50))
+                // Ignore
             }
-        } else {
-            dockList.add(AppItem("com.google.android.apps.messaging", label = "Messages", iconVector = Icons.Outlined.Chat, iconColor = 0xFF4CAF50))
         }
 
-        // 3. Gallery / Photos
+        // 3. Gallery / Photos - ONLY if found and known on device
         val galleryIntent = Intent(Intent.ACTION_VIEW).apply { type = "image/*" }
         val galleryResolve = try { pm.resolveActivity(galleryIntent, 0) } catch (e: Exception) { null }
-        if (galleryResolve != null && galleryResolve.activityInfo.packageName != "android") {
-            try {
-                val pName = galleryResolve.activityInfo.packageName
-                val d = galleryResolve.loadIcon(pm)
-                val bmp = IconUtils.drawableToImageBitmap(d, pName)
-                dockList.add(
-                    AppItem(
-                        packageName = pName,
-                        activityName = galleryResolve.activityInfo.name,
-                        label = galleryResolve.loadLabel(pm).toString(),
-                        iconDrawable = d,
-                        iconBitmap = bmp,
-                        iconVector = Icons.Outlined.Image,
-                        iconColor = 0xFF26A69A
+        if (galleryResolve != null && galleryResolve.activityInfo.packageName != "android" && galleryResolve.activityInfo.packageName != context.packageName) {
+            val pName = galleryResolve.activityInfo.packageName
+            val launchIntent = try { pm.getLaunchIntentForPackage(pName) } catch (e: Exception) { null }
+            if (launchIntent != null) {
+                try {
+                    val d = galleryResolve.loadIcon(pm)
+                    val bmp = IconUtils.drawableToImageBitmap(d, pName)
+                    dockList.add(
+                        AppItem(
+                            packageName = pName,
+                            activityName = galleryResolve.activityInfo.name,
+                            label = galleryResolve.loadLabel(pm).toString(),
+                            iconDrawable = d,
+                            iconBitmap = bmp,
+                            iconVector = Icons.Outlined.Image,
+                            iconColor = 0xFF26A69A
+                        )
                     )
-                )
-            } catch (e: Exception) {
-                dockList.add(AppItem("com.google.android.apps.photos", label = "Gallery", iconVector = Icons.Outlined.Image, iconColor = 0xFF26A69A))
+                } catch (e: Exception) {
+                    // Do not add unknown gallery
+                }
             }
-        } else {
-            dockList.add(AppItem("com.google.android.apps.photos", label = "Gallery", iconVector = Icons.Outlined.Image, iconColor = 0xFF26A69A))
         }
 
         // 4. Browser / Chrome
         val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"))
         val webResolve = try { pm.resolveActivity(webIntent, PackageManager.MATCH_DEFAULT_ONLY) } catch (e: Exception) { null }
-        if (webResolve != null && webResolve.activityInfo.packageName != "android") {
+        if (webResolve != null && webResolve.activityInfo.packageName != "android" && webResolve.activityInfo.packageName != context.packageName) {
             try {
                 val pName = webResolve.activityInfo.packageName
                 val d = webResolve.loadIcon(pm)
@@ -188,16 +185,14 @@ class AppRepository(private val context: Context) {
                     )
                 )
             } catch (e: Exception) {
-                dockList.add(AppItem("com.android.chrome", label = "Chrome", iconVector = Icons.Default.Language, iconColor = 0xFFFF7043))
+                // Ignore
             }
-        } else {
-            dockList.add(AppItem("com.android.chrome", label = "Chrome", iconVector = Icons.Default.Language, iconColor = 0xFFFF7043))
         }
 
         // 5. Camera
         val cameraIntent = Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
         val cameraResolve = try { pm.resolveActivity(cameraIntent, PackageManager.MATCH_DEFAULT_ONLY) } catch (e: Exception) { null }
-        if (cameraResolve != null && cameraResolve.activityInfo.packageName != "android") {
+        if (cameraResolve != null && cameraResolve.activityInfo.packageName != "android" && cameraResolve.activityInfo.packageName != context.packageName) {
             try {
                 val pName = cameraResolve.activityInfo.packageName
                 val d = cameraResolve.loadIcon(pm)
@@ -214,10 +209,20 @@ class AppRepository(private val context: Context) {
                     )
                 )
             } catch (e: Exception) {
-                dockList.add(AppItem("com.google.android.GoogleCamera", label = "Camera", iconVector = Icons.Default.CameraAlt, iconColor = 0xFFE91E63))
+                // Ignore
             }
-        } else {
-            dockList.add(AppItem("com.google.android.GoogleCamera", label = "Camera", iconVector = Icons.Default.CameraAlt, iconColor = 0xFFE91E63))
+        }
+
+        // If in preview with no resolved apps, fallback to basic curated dock apps without duplicates
+        if (dockList.isEmpty()) {
+            dockList.addAll(
+                listOf(
+                    AppItem("com.android.dialer", label = "Phone", iconVector = Icons.Default.Phone, iconColor = 0xFF2196F3),
+                    AppItem("com.android.messaging", label = "Messages", iconVector = Icons.Outlined.Chat, iconColor = 0xFF4CAF50),
+                    AppItem("com.android.chrome", label = "Browser", iconVector = Icons.Default.Language, iconColor = 0xFFFF7043),
+                    AppItem("com.android.camera2", label = "Camera", iconVector = Icons.Default.CameraAlt, iconColor = 0xFFE91E63)
+                )
+            )
         }
 
         return dockList.distinctBy { it.packageName }

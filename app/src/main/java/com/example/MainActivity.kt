@@ -17,6 +17,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import android.graphics.Color as AndroidColor
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -271,13 +276,17 @@ fun SparkLauncherApp(
             transitionSpec = {
                 when {
                     targetState == LauncherScreen.APP_DRAWER ->
-                        slideInVertically { it } togetherWith slideOutVertically { -it }
+                        (slideInVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) { it / 3 } + fadeIn(tween(180)))
+                            .togetherWith(fadeOut(animationSpec = tween(120)))
                     initialState == LauncherScreen.APP_DRAWER ->
-                        slideInVertically { -it } togetherWith slideOutVertically { it }
+                        fadeIn(animationSpec = tween(140))
+                            .togetherWith(slideOutVertically(animationSpec = tween(180, easing = FastOutLinearInEasing)) { it / 3 } + fadeOut(tween(140)))
                     targetState == LauncherScreen.RECENTS_OVERVIEW || initialState == LauncherScreen.RECENTS_OVERVIEW ->
-                        slideInHorizontally { -it } togetherWith slideOutHorizontally { it }
+                        (slideInHorizontally(animationSpec = tween(220)) { -it / 3 } + fadeIn(tween(180)))
+                            .togetherWith(slideOutHorizontally(animationSpec = tween(180)) { it / 3 } + fadeOut(tween(140)))
                     else ->
-                        slideInHorizontally { it } togetherWith slideOutHorizontally { -it }
+                        (slideInHorizontally(animationSpec = tween(220)) { it / 3 } + fadeIn(tween(180)))
+                            .togetherWith(slideOutHorizontally(animationSpec = tween(180)) { -it / 3 } + fadeOut(tween(140)))
                 }
             },
             label = "ScreenTransition"

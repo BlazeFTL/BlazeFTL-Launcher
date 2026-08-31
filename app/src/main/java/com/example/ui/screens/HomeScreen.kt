@@ -132,14 +132,6 @@ fun HomeScreen(
                 )
             }
     ) {
-        // Wallpaper background
-        Image(
-            painter = painterResource(id = R.drawable.img_astronaut_wallpaper),
-            contentDescription = "Astronaut ocean wallpaper",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
-
         // Status bar shadow overlay if enabled
         if (settings.statusBarShadow) {
             Box(
@@ -184,41 +176,34 @@ fun HomeScreen(
             val iconBaseDp = (48 * iconScale).dp
             val fontSizeSp = (11.5f * (settings.fontSizePercent / 100f)).sp
 
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(6),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp)
-            ) {
-                items(homeApps) { app ->
-                    DesktopAppIcon(
-                        app = app,
-                        iconSizeDp = iconBaseDp,
-                        fontSizeSp = fontSizeSp,
-                        showLabel = settings.iconLabelsOnDesktop,
-                        maxLines = settings.maxLabelLines,
-                        forceMonochrome = settings.forceMonochrome && settings.themedIcons,
-                        onClick = { onAppClick(app) },
-                        onLongClick = { selectedAppForPopup = app }
-                    )
+            if (homeApps.isNotEmpty()) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(6),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp)
+                ) {
+                    items(homeApps, key = { it.packageName }, contentType = { "desktop_app" }) { app ->
+                        DesktopAppIcon(
+                            app = app,
+                            iconSizeDp = iconBaseDp,
+                            fontSizeSp = fontSizeSp,
+                            showLabel = settings.iconLabelsOnDesktop,
+                            maxLines = settings.maxLabelLines,
+                            forceMonochrome = settings.forceMonochrome && settings.themedIcons,
+                            onClick = { onAppClick(app) },
+                            onLongClick = { selectedAppForPopup = app }
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // Optional Dock Search Bar
-            if (settings.googleSearchBar) {
-                DockSearchBar(
-                    settings = settings,
-                    onSearchClick = onOpenDrawer,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
-                )
-            }
-
-            // Bottom Hotseat Dock
+            // Bottom Hotseat Dock (Apps placed ABOVE bottom search bar)
             HotseatDock(
                 settings = settings,
                 dockApps = dockApps,
@@ -229,6 +214,15 @@ fun HomeScreen(
                 onOpenRecents = onOpenRecents,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            // Dock Search Bar at the VERY BOTTOM below dock apps
+            if (settings.googleSearchBar) {
+                DockSearchBar(
+                    settings = settings,
+                    onSearchClick = onOpenDrawer,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                )
+            }
         }
 
         // Desktop Long Press Dialog

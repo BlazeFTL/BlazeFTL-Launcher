@@ -36,6 +36,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,6 +57,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,9 +65,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -112,13 +118,57 @@ fun AppDrawerScreen(
     val overlayAlpha = (settings.drawerBackgroundOpacity / 100f).coerceIn(0.2f, 0.95f)
     var totalDragY by remember { mutableStateOf(0f) }
 
+    val gridState = rememberLazyGridState()
+    val isAtTop by remember {
+        derivedStateOf {
+            gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
+        }
+    }
+
+    var accumulatedPullY by remember { mutableStateOf(0f) }
+
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                // When dragging down while already at the top of the grid
+                if (isAtTop && available.y > 0) {
+                    accumulatedPullY += available.y
+                    if (accumulatedPullY > 80f) {
+                        accumulatedPullY = 0f
+                        onCloseDrawer()
+                        return available
+                    }
+                } else if (available.y < 0) {
+                    accumulatedPullY = 0f
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (available.y > 0) {
+                    accumulatedPullY += available.y
+                    if (accumulatedPullY > 60f) {
+                        accumulatedPullY = 0f
+                        onCloseDrawer()
+                        return available
+                    }
+                }
+                return Offset.Zero
+            }
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .draggable(
                 state = rememberDraggableState { delta ->
                     totalDragY += delta
-                    if (totalDragY > 80f) {
+                    if (totalDragY > 70f) {
                         totalDragY = 0f
                         onCloseDrawer()
                     }
@@ -127,15 +177,7 @@ fun AppDrawerScreen(
                 onDragStopped = { totalDragY = 0f }
             )
     ) {
-        // Wallpaper underneath
-        Image(
-            painter = painterResource(id = R.drawable.img_astronaut_wallpaper),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
-
-        // Translucent overlay
+        // Translucent overlay over the system wallpaper
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -273,6 +315,7 @@ fun AppDrawerScreen(
             val fontSizeSp = (11.5f * (settings.fontSizePercent / 100f)).sp
 
             LazyVerticalGrid(
+                state = gridState,
                 columns = GridCells.Fixed(6),
                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(verticalSpacing),
@@ -280,9 +323,14 @@ fun AppDrawerScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .nestedScroll(nestedScrollConnection)
                     .padding(horizontal = 4.dp)
             ) {
-                items(filteredApps) { app ->
+                items(
+                    items = filteredApps,
+                    key = { it.packageName },
+                    contentType = { "drawer_app" }
+                ) { app ->
                     DrawerAppItemView(
                         app = app,
                         iconSizeDp = iconBaseDp,

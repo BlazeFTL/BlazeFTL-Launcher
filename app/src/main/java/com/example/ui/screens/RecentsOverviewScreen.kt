@@ -74,14 +74,6 @@ fun RecentsOverviewScreen(
     val overlayAlpha = (settings.recentsBackgroundOpacity / 100f).coerceIn(0.2f, 0.9f)
 
     Box(modifier = modifier.fillMaxSize()) {
-        // Blurred wallpaper background
-        Image(
-            painter = painterResource(id = R.drawable.img_astronaut_wallpaper),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
-
         Box(
             modifier = Modifier
                 .fillMaxSize()
