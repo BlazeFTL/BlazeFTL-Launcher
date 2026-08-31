@@ -389,11 +389,10 @@ fun HotseatDock(
         Color.Transparent
     }
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    Box(
         modifier = modifier
             .background(dockBg, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp)
+            .padding(horizontal = 8.dp, vertical = 8.dp)
     ) {
         Row(
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -411,52 +410,6 @@ fun HotseatDock(
                     onClick = { onAppClick(app) },
                     onLongClick = { onAppClick(app) },
                     modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // Virtual Navigation Bar Buttons / Pill (Recents || Home || Back/Drawer)
-        Row(
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth(0.7f)
-                .padding(bottom = 2.dp)
-        ) {
-            IconButton(
-                onClick = onOpenRecents,
-                modifier = Modifier.size(40.dp).testTag("nav_btn_recents")
-            ) {
-                Text("|||", color = Color.White.copy(alpha = 0.85f), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            }
-
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .size(width = 36.dp, height = 18.dp)
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(Color.White.copy(alpha = 0.35f))
-                    .clickable { onOpenDrawer() }
-                    .testTag("nav_btn_home_pill")
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .background(Color.White, CircleShape)
-                )
-            }
-
-            IconButton(
-                onClick = onOpenDrawer,
-                modifier = Modifier.size(40.dp).testTag("nav_btn_drawer")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.GridView,
-                    contentDescription = "App Drawer",
-                    tint = Color.White.copy(alpha = 0.85f),
-                    modifier = Modifier.size(20.dp)
                 )
             }
         }

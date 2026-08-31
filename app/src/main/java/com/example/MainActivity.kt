@@ -96,7 +96,7 @@ fun SparkLauncherApp(
     val settings by prefsRepo.settings.collectAsState()
     var currentScreen by remember { mutableStateOf(LauncherScreen.HOME) }
     var installedApps by remember { mutableStateOf<List<AppItem>>(emptyList()) }
-    val dockApps = remember { appRepo.getDockApps() }
+    val dockApps = remember(installedApps) { appRepo.getDockApps() }
     
     val homeAppsList = remember { mutableStateListOf<AppItem>() }
 

@@ -75,76 +75,134 @@ class AppRepository(private val context: Context) {
             }
         }.sortedBy { it.label.lowercase() }
 
-        if (deviceApps.size >= 8) {
+        if (deviceApps.isNotEmpty()) {
             deviceApps
         } else {
-            // Combine with default curated launcher apps matching the reference screenshots
-            val defaultApps = getCuratedApps()
-            val combined = (deviceApps + defaultApps).distinctBy { it.label }
-            combined.sortedBy { it.label.lowercase() }
+            // Fallback for previews
+            getCuratedApps().sortedBy { it.label.lowercase() }
         }
     }
 
     fun getDockApps(): List<AppItem> {
-        return listOf(
-            AppItem(
-                packageName = "com.google.android.dialer",
-                label = "Phone",
-                iconVector = Icons.Default.Phone,
-                iconColor = 0xFF2196F3
-            ),
-            AppItem(
-                packageName = "com.google.android.apps.messaging",
-                label = "Messages",
-                iconVector = Icons.Outlined.Chat,
-                iconColor = 0xFF4CAF50
-            ),
-            AppItem(
-                packageName = "com.google.android.apps.photos",
-                label = "Gallery",
-                iconVector = Icons.Outlined.Image,
-                iconColor = 0xFF26A69A
-            ),
-            AppItem(
-                packageName = "org.mozilla.firefox",
-                label = "Firefox",
-                iconVector = Icons.Default.Language,
-                iconColor = 0xFFFF7043
-            ),
-            AppItem(
-                packageName = "org.mozilla.fenix",
-                label = "Nightly",
-                iconVector = Icons.Outlined.Public,
-                iconColor = 0xFFAB47BC
-            ),
-            AppItem(
-                packageName = "com.google.android.GoogleCamera",
-                label = "Camera",
-                iconVector = Icons.Default.CameraAlt,
-                iconColor = 0xFF455A64
-            )
-        )
+        val pm = context.packageManager
+        val dockList = mutableListOf<AppItem>()
+
+        // 1. Phone / Dialer
+        val phoneIntent = Intent(Intent.ACTION_DIAL)
+        val phoneResolve = try { pm.resolveActivity(phoneIntent, PackageManager.MATCH_DEFAULT_ONLY) } catch (e: Exception) { null }
+        if (phoneResolve != null && phoneResolve.activityInfo.packageName != "android") {
+            try {
+                dockList.add(
+                    AppItem(
+                        packageName = phoneResolve.activityInfo.packageName,
+                        activityName = phoneResolve.activityInfo.name,
+                        label = phoneResolve.loadLabel(pm).toString(),
+                        iconDrawable = phoneResolve.loadIcon(pm),
+                        iconVector = Icons.Default.Phone,
+                        iconColor = 0xFF2196F3
+                    )
+                )
+            } catch (e: Exception) {
+                dockList.add(AppItem("com.google.android.dialer", label = "Phone", iconVector = Icons.Default.Phone, iconColor = 0xFF2196F3))
+            }
+        } else {
+            dockList.add(AppItem("com.google.android.dialer", label = "Phone", iconVector = Icons.Default.Phone, iconColor = 0xFF2196F3))
+        }
+
+        // 2. Messages / SMS
+        val msgIntent = Intent(Intent.ACTION_SENDTO).apply { data = Uri.parse("smsto:") }
+        val msgResolve = try { pm.resolveActivity(msgIntent, PackageManager.MATCH_DEFAULT_ONLY) } catch (e: Exception) { null }
+        if (msgResolve != null && msgResolve.activityInfo.packageName != "android") {
+            try {
+                dockList.add(
+                    AppItem(
+                        packageName = msgResolve.activityInfo.packageName,
+                        activityName = msgResolve.activityInfo.name,
+                        label = msgResolve.loadLabel(pm).toString(),
+                        iconDrawable = msgResolve.loadIcon(pm),
+                        iconVector = Icons.Outlined.Chat,
+                        iconColor = 0xFF4CAF50
+                    )
+                )
+            } catch (e: Exception) {
+                dockList.add(AppItem("com.google.android.apps.messaging", label = "Messages", iconVector = Icons.Outlined.Chat, iconColor = 0xFF4CAF50))
+            }
+        } else {
+            dockList.add(AppItem("com.google.android.apps.messaging", label = "Messages", iconVector = Icons.Outlined.Chat, iconColor = 0xFF4CAF50))
+        }
+
+        // 3. Gallery / Photos
+        val galleryIntent = Intent(Intent.ACTION_VIEW).apply { type = "image/*" }
+        val galleryResolve = try { pm.resolveActivity(galleryIntent, 0) } catch (e: Exception) { null }
+        if (galleryResolve != null && galleryResolve.activityInfo.packageName != "android") {
+            try {
+                dockList.add(
+                    AppItem(
+                        packageName = galleryResolve.activityInfo.packageName,
+                        activityName = galleryResolve.activityInfo.name,
+                        label = galleryResolve.loadLabel(pm).toString(),
+                        iconDrawable = galleryResolve.loadIcon(pm),
+                        iconVector = Icons.Outlined.Image,
+                        iconColor = 0xFF26A69A
+                    )
+                )
+            } catch (e: Exception) {
+                dockList.add(AppItem("com.google.android.apps.photos", label = "Gallery", iconVector = Icons.Outlined.Image, iconColor = 0xFF26A69A))
+            }
+        } else {
+            dockList.add(AppItem("com.google.android.apps.photos", label = "Gallery", iconVector = Icons.Outlined.Image, iconColor = 0xFF26A69A))
+        }
+
+        // 4. Browser / Chrome
+        val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"))
+        val webResolve = try { pm.resolveActivity(webIntent, PackageManager.MATCH_DEFAULT_ONLY) } catch (e: Exception) { null }
+        if (webResolve != null && webResolve.activityInfo.packageName != "android") {
+            try {
+                dockList.add(
+                    AppItem(
+                        packageName = webResolve.activityInfo.packageName,
+                        activityName = webResolve.activityInfo.name,
+                        label = webResolve.loadLabel(pm).toString(),
+                        iconDrawable = webResolve.loadIcon(pm),
+                        iconVector = Icons.Default.Language,
+                        iconColor = 0xFFFF7043
+                    )
+                )
+            } catch (e: Exception) {
+                dockList.add(AppItem("com.android.chrome", label = "Chrome", iconVector = Icons.Default.Language, iconColor = 0xFFFF7043))
+            }
+        } else {
+            dockList.add(AppItem("com.android.chrome", label = "Chrome", iconVector = Icons.Default.Language, iconColor = 0xFFFF7043))
+        }
+
+        // 5. Camera
+        val cameraIntent = Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE)
+        val cameraResolve = try { pm.resolveActivity(cameraIntent, PackageManager.MATCH_DEFAULT_ONLY) } catch (e: Exception) { null }
+        if (cameraResolve != null && cameraResolve.activityInfo.packageName != "android") {
+            try {
+                dockList.add(
+                    AppItem(
+                        packageName = cameraResolve.activityInfo.packageName,
+                        activityName = cameraResolve.activityInfo.name,
+                        label = cameraResolve.loadLabel(pm).toString(),
+                        iconDrawable = cameraResolve.loadIcon(pm),
+                        iconVector = Icons.Default.CameraAlt,
+                        iconColor = 0xFF455A64
+                    )
+                )
+            } catch (e: Exception) {
+                dockList.add(AppItem("com.google.android.GoogleCamera", label = "Camera", iconVector = Icons.Default.CameraAlt, iconColor = 0xFF455A64))
+            }
+        } else {
+            dockList.add(AppItem("com.google.android.GoogleCamera", label = "Camera", iconVector = Icons.Default.CameraAlt, iconColor = 0xFF455A64))
+        }
+
+        return dockList.distinctBy { it.packageName }
     }
 
     fun getHomeScreenApps(): List<AppItem> {
-        return listOf(
-            AppItem(packageName = "com.idmplus", label = "IDM+", iconVector = Icons.Outlined.Download, iconColor = 0xFFFF9800),
-            AppItem(packageName = "com.mxtech.videoplayer.pro", label = "MX Player Pro", iconVector = Icons.Default.PlayArrow, iconColor = 0xFF2196F3),
-            AppItem(packageName = "com.bdix.bypass", label = "Bdix ByPass", iconVector = Icons.Outlined.Widgets, iconColor = 0xFF00BCD4),
-            AppItem(packageName = "com.facebook.lite", label = "Lite", iconVector = Icons.Outlined.Public, iconColor = 0xFF1877F2),
-            AppItem(packageName = "com.oasisfeng.greenify", label = "Greenify", iconVector = Icons.Outlined.Tune, iconColor = 0xFF4CAF50),
-            AppItem(packageName = "com.google.android.apps.maps", label = "Maps", iconVector = Icons.Default.Map, iconColor = 0xFFE91E63),
-            AppItem(packageName = "com.facebook.orca", label = "Messenger", iconVector = Icons.Outlined.Chat, iconColor = 0xFF0084FF),
-            AppItem(packageName = "org.telegram.ayugram", label = "AyuGram", iconVector = Icons.Outlined.Chat, iconColor = 0xFF9C27B0),
-            AppItem(packageName = "com.lemur.browser", label = "Lemur Brow...", iconVector = Icons.Default.Language, iconColor = 0xFF00ACC1),
-            AppItem(packageName = "com.google.android.apps.photos", label = "Gallery", iconVector = Icons.Outlined.Image, iconColor = 0xFF42A5F5),
-            AppItem(packageName = "com.spark.aislop", label = "Ai Slop", iconVector = Icons.Default.SmartToy, iconColor = 0xFF7E57C2),
-            AppItem(packageName = "com.xodo.pdf", label = "Xodo", iconVector = Icons.Outlined.Folder, iconColor = 0xFF26C6DA),
-            AppItem(packageName = "com.google.android.youtube", label = "YouTube", iconVector = Icons.Default.VideoLibrary, iconColor = 0xFFF44336),
-            AppItem(packageName = "com.myrobi.app", label = "My Robi", iconVector = Icons.Outlined.ShoppingBag, iconColor = 0xFFFF5722),
-            AppItem(packageName = "com.android.vending", label = "Play Store", iconVector = Icons.Default.PlayArrow, iconColor = 0xFF4CAF50),
-            AppItem(packageName = "com.android.settings", label = "Settings", iconVector = Icons.Default.Settings, iconColor = 0xFF607D8B)
-        )
+        // Clean and empty desktop by default like Nova Launcher, letting the user customize and pin apps as they wish
+        return emptyList()
     }
 
     private fun getCuratedApps(): List<AppItem> {
