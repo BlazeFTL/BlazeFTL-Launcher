@@ -1,9 +1,11 @@
 package com.example.model
 
 import android.graphics.drawable.Drawable
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 
+@Immutable
 data class AppItem(
     val packageName: String,
     val activityName: String = "",

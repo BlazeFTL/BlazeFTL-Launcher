@@ -117,7 +117,6 @@ fun AppDrawerScreen(
     }
 
     val overlayAlpha = (settings.drawerBackgroundOpacity / 100f).coerceIn(0.2f, 0.95f)
-    var totalDragY by remember { mutableStateOf(0f) }
 
     val gridState = rememberLazyGridState()
     val isAtTop by remember {
@@ -126,21 +125,13 @@ fun AppDrawerScreen(
         }
     }
 
-    var accumulatedPullY by remember { mutableStateOf(0f) }
-
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // When dragging down while already at the top of the grid
-                if (isAtTop && available.y > 0) {
-                    accumulatedPullY += available.y
-                    if (accumulatedPullY > 80f) {
-                        accumulatedPullY = 0f
-                        onCloseDrawer()
-                        return available
-                    }
-                } else if (available.y < 0) {
-                    accumulatedPullY = 0f
+                // When dragging down while already at the top of the grid, dismiss on single pull
+                if (isAtTop && available.y > 15f && source == NestedScrollSource.UserInput) {
+                    onCloseDrawer()
+                    return available
                 }
                 return Offset.Zero
             }
@@ -150,13 +141,9 @@ fun AppDrawerScreen(
                 available: Offset,
                 source: NestedScrollSource
             ): Offset {
-                if (available.y > 0) {
-                    accumulatedPullY += available.y
-                    if (accumulatedPullY > 60f) {
-                        accumulatedPullY = 0f
-                        onCloseDrawer()
-                        return available
-                    }
+                if (available.y > 10f && source == NestedScrollSource.UserInput) {
+                    onCloseDrawer()
+                    return available
                 }
                 return Offset.Zero
             }
@@ -166,17 +153,7 @@ fun AppDrawerScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .draggable(
-                state = rememberDraggableState { delta ->
-                    totalDragY += delta
-                    if (totalDragY > 70f) {
-                        totalDragY = 0f
-                        onCloseDrawer()
-                    }
-                },
-                orientation = Orientation.Vertical,
-                onDragStopped = { totalDragY = 0f }
-            )
+            .nestedScroll(nestedScrollConnection)
     ) {
         // Translucent overlay over the system wallpaper
         Box(
@@ -473,7 +450,7 @@ fun DrawerAppItemView(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .pointerInput(Unit) {
+            .pointerInput(app.uniqueKey) {
                 detectTapGestures(
                     onTap = { onClick() },
                     onLongPress = { onLongClick() }

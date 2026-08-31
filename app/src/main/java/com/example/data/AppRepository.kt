@@ -379,18 +379,14 @@ class AppRepository(private val context: Context) {
         return try {
             val statusBarService = context.getSystemService("statusbar")
             val statusBarManager = Class.forName("android.app.StatusBarManager")
-            val method = try {
-                statusBarManager.getMethod("expandSettingsPanel")
-            } catch (e: Exception) {
-                statusBarManager.getMethod("expandNotificationsPanel")
-            }
+            val method = statusBarManager.getMethod("expandNotificationsPanel")
             method.invoke(statusBarService)
             true
         } catch (e: Exception) {
             try {
                 val statusBarService = context.getSystemService("statusbar")
                 val statusBarManager = Class.forName("android.app.StatusBarManager")
-                val method = statusBarManager.getMethod("expandNotificationsPanel")
+                val method = statusBarManager.getMethod("expandSettingsPanel")
                 method.invoke(statusBarService)
                 true
             } catch (e2: Exception) {

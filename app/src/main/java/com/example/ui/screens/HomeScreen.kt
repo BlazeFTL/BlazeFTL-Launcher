@@ -298,134 +298,187 @@ fun QuickspaceWidget(
     onSongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val dateFormat = remember { SimpleDateFormat("EEEE, MMM d", Locale.getDefault()) }
-    val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
-    var currentDateStr by remember { mutableStateOf(dateFormat.format(Date())) }
-    var currentTimeStr by remember { mutableStateOf(timeFormat.format(Date())) }
+    val dayOfWeekFormat = remember { SimpleDateFormat("EEEE", Locale.getDefault()) }
+    val monthDayFormat = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
+    val hourMinuteFormat = remember { SimpleDateFormat("h:mm", Locale.getDefault()) }
+    val amPmFormat = remember { SimpleDateFormat("a", Locale.getDefault()) }
+
+    var currentDayOfWeek by remember { mutableStateOf(dayOfWeekFormat.format(Date())) }
+    var currentMonthDay by remember { mutableStateOf(monthDayFormat.format(Date())) }
+    var currentHourMinute by remember { mutableStateOf(hourMinuteFormat.format(Date())) }
+    var currentAmPm by remember { mutableStateOf(amPmFormat.format(Date())) }
 
     LaunchedEffect(Unit) {
         while (true) {
-            currentDateStr = dateFormat.format(Date())
-            currentTimeStr = timeFormat.format(Date())
+            val now = Date()
+            currentDayOfWeek = dayOfWeekFormat.format(now)
+            currentMonthDay = monthDayFormat.format(now)
+            currentHourMinute = hourMinuteFormat.format(now)
+            currentAmPm = amPmFormat.format(now)
             delay(1000L)
         }
     }
 
-    val textShadow = remember {
+    val widgetShadow = remember {
         Shadow(
-            color = Color.Black.copy(alpha = 0.6f),
-            offset = Offset(1f, 2f),
-            blurRadius = 4f
+            color = Color.Black.copy(alpha = 0.55f),
+            offset = Offset(1.5f, 2.5f),
+            blurRadius = 6f
         )
     }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onSongClick() }
-            .padding(vertical = 8.dp)
+            .padding(vertical = 4.dp)
     ) {
         if (settings.nowPlaying && isMusicPlaying) {
-            // Music is actively playing
-            Row(
-                verticalAlignment = Alignment.CenterVertically
+            // Modern Glassmorphic Now Playing Card
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = Color.Black.copy(alpha = 0.35f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onSongClick() }
             ) {
-                Text(
-                    text = "Now playing",
-                    color = Color.White.copy(alpha = 0.95f),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    style = androidx.compose.ui.text.TextStyle(shadow = textShadow)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Icon(
-                    imageVector = Icons.Default.MusicNote,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.95f),
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = currentSong.first,
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = androidx.compose.ui.text.TextStyle(shadow = textShadow)
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "By ${currentSong.second}",
-                color = Color.White.copy(alpha = 0.85f),
-                fontSize = 13.sp,
-                style = androidx.compose.ui.text.TextStyle(shadow = textShadow)
-            )
-        } else {
-            // Default At-A-Glance: Live Date, Time & Weather Condition
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.CalendarToday,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.9f),
-                    modifier = Modifier.size(14.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = currentDateStr,
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    style = androidx.compose.ui.text.TextStyle(shadow = textShadow)
-                )
-                if (settings.weatherCondition) {
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "•",
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 13.sp
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color(0xFFE85D54).copy(alpha = 0.25f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = "Now Playing",
+                            tint = Color(0xFFFF8A80),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = currentSong.first,
+                            color = Color.White,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "by ${currentSong.second}",
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
+                        )
+                    }
+
                     Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        imageVector = Icons.Outlined.WbSunny,
-                        contentDescription = "Weather",
-                        tint = Color(0xFFFFD54F),
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (settings.detailedWeather) "24°C Sunny" else "24°C",
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        style = androidx.compose.ui.text.TextStyle(shadow = textShadow)
-                    )
+
+                    // Animated Equalizer Visualizer Bars
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
+                        verticalAlignment = Alignment.Bottom,
+                        modifier = Modifier.height(18.dp)
+                    ) {
+                        Box(modifier = Modifier.width(3.dp).height(12.dp).background(Color(0xFFFF8A80), RoundedCornerShape(2.dp)))
+                        Box(modifier = Modifier.width(3.dp).height(18.dp).background(Color(0xFFFF8A80), RoundedCornerShape(2.dp)))
+                        Box(modifier = Modifier.width(3.dp).height(8.dp).background(Color(0xFFFF8A80), RoundedCornerShape(2.dp)))
+                    }
                 }
             }
-
-            if (settings.extendedStyle) {
-                Spacer(modifier = Modifier.height(4.dp))
+        } else {
+            // Modern High-End Date & Clock Widget
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onSongClick() }
+            ) {
+                // Large Modern Clock Typography
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Bottom,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                ) {
+                    Text(
+                        text = currentHourMinute,
+                        color = Color.White,
+                        fontSize = 46.sp,
+                        fontWeight = FontWeight.Light,
+                        letterSpacing = (-1).sp,
+                        style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .padding(bottom = 8.dp)
+                            .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = currentAmPm.uppercase(),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+
+                // Modern At-A-Glance Capsule Row: Date & Weather
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Schedule,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.size(13.dp)
+                        imageVector = Icons.Outlined.CalendarToday,
+                        contentDescription = "Date",
+                        tint = Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = currentTimeStr,
-                        color = Color.White.copy(alpha = 0.9f),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Normal,
-                        style = androidx.compose.ui.text.TextStyle(shadow = textShadow)
+                        text = "$currentDayOfWeek, $currentMonthDay",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
                     )
+
+                    if (settings.weatherCondition) {
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(4.dp)
+                                .background(Color.White.copy(alpha = 0.5f), CircleShape)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Icon(
+                            imageVector = Icons.Outlined.WbSunny,
+                            contentDescription = "Weather",
+                            tint = Color(0xFFFFD54F),
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = if (settings.detailedWeather) "24°C • Sunny" else "24°C",
+                            color = Color.White.copy(alpha = 0.95f),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
+                        )
+                    }
                 }
             }
         }
@@ -448,7 +501,7 @@ fun DesktopAppIcon(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .pointerInput(Unit) {
+            .pointerInput(app.uniqueKey) {
                 detectTapGestures(
                     onTap = { onClick() },
                     onLongPress = { onLongClick() }

@@ -286,13 +286,13 @@ fun SparkLauncherApp(
                 when {
                     // Home -> App Drawer: smooth upward slide & fade
                     initialState == LauncherScreen.HOME && targetState == LauncherScreen.APP_DRAWER ->
-                        (slideInVertically(animationSpec = tween(300, easing = FastOutSlowInEasing)) { (it * 0.35f).toInt() } + fadeIn(tween(220)))
-                            .togetherWith(slideOutVertically(animationSpec = tween(240, easing = FastOutLinearInEasing)) { (-it * 0.15f).toInt() } + fadeOut(tween(180)))
+                        (slideInVertically(animationSpec = tween(260, easing = FastOutSlowInEasing)) { (it * 0.25f).toInt() } + fadeIn(tween(180)))
+                            .togetherWith(fadeOut(animationSpec = tween(120)))
 
                     // App Drawer -> Home: smooth downward return
                     initialState == LauncherScreen.APP_DRAWER && targetState == LauncherScreen.HOME ->
-                        (slideInVertically(animationSpec = tween(260, easing = FastOutSlowInEasing)) { (-it * 0.15f).toInt() } + fadeIn(tween(200)))
-                            .togetherWith(slideOutVertically(animationSpec = tween(280, easing = FastOutSlowInEasing)) { (it * 0.35f).toInt() } + fadeOut(tween(200)))
+                        fadeIn(animationSpec = tween(160))
+                            .togetherWith(slideOutVertically(animationSpec = tween(240, easing = FastOutSlowInEasing)) { (it * 0.25f).toInt() } + fadeOut(tween(160)))
 
                     targetState == LauncherScreen.RECENTS_OVERVIEW || initialState == LauncherScreen.RECENTS_OVERVIEW ->
                         (slideInHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { -it / 3 } + fadeIn(tween(200)))
