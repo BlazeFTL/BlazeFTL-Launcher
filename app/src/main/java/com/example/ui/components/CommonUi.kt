@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -345,66 +346,78 @@ fun AppIconBadge(
     app: com.example.model.AppItem,
     sizeDp: Dp = 48.dp,
     forceMonochrome: Boolean = false,
+    showNotificationDot: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val realBitmap = remember(app.iconDrawable, app.packageName) {
+    val realBitmap = app.iconBitmap ?: remember(app.iconDrawable, app.packageName) {
         IconUtils.drawableToImageBitmap(app.iconDrawable, app.packageName)
     }
 
-    if (realBitmap != null) {
-        if (forceMonochrome) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = modifier
-                    .size(sizeDp)
-                    .background(Color(0xFFE2E8F0), CircleShape)
-                    .clip(CircleShape)
-            ) {
+    Box(modifier = modifier.size(sizeDp)) {
+        if (realBitmap != null) {
+            if (forceMonochrome) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFFE2E8F0), CircleShape)
+                        .clip(CircleShape)
+                ) {
+                    Image(
+                        bitmap = realBitmap,
+                        contentDescription = app.label,
+                        colorFilter = ColorFilter.tint(Color(0xFF1E293B)),
+                        modifier = Modifier.size(sizeDp * 0.65f)
+                    )
+                }
+            } else {
                 Image(
                     bitmap = realBitmap,
                     contentDescription = app.label,
-                    colorFilter = ColorFilter.tint(Color(0xFF1E293B)),
-                    modifier = Modifier.size(sizeDp * 0.65f)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
                 )
             }
         } else {
-            Image(
-                bitmap = realBitmap,
-                contentDescription = app.label,
-                modifier = modifier
-                    .size(sizeDp)
-                    .clip(CircleShape)
-            )
-        }
-    } else {
-        val bg = if (forceMonochrome) Color(0xFFE2E8F0) else Color(app.iconColor)
-        val tint = if (forceMonochrome) Color(0xFF1E293B) else Color.White
+            val bg = if (forceMonochrome) Color(0xFFE2E8F0) else Color(app.iconColor)
+            val tint = if (forceMonochrome) Color(0xFF1E293B) else Color.White
 
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = modifier
-                .size(sizeDp)
-                .background(
-                    color = bg,
-                    shape = CircleShape
-                )
-                .clip(CircleShape)
-        ) {
-            if (app.iconVector != null) {
-                Icon(
-                    imageVector = app.iconVector,
-                    contentDescription = app.label,
-                    tint = tint,
-                    modifier = Modifier.size(sizeDp * 0.58f)
-                )
-            } else {
-                Text(
-                    text = app.label.take(1).uppercase(),
-                    fontSize = (sizeDp.value * 0.45f).sp,
-                    fontWeight = FontWeight.Bold,
-                    color = tint
-                )
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        color = bg,
+                        shape = CircleShape
+                    )
+                    .clip(CircleShape)
+            ) {
+                if (app.iconVector != null) {
+                    Icon(
+                        imageVector = app.iconVector,
+                        contentDescription = app.label,
+                        tint = tint,
+                        modifier = Modifier.size(sizeDp * 0.58f)
+                    )
+                } else {
+                    Text(
+                        text = app.label.take(1).uppercase(),
+                        fontSize = (sizeDp.value * 0.45f).sp,
+                        fontWeight = FontWeight.Bold,
+                        color = tint
+                    )
+                }
             }
+        }
+
+        if (showNotificationDot) {
+            Box(
+                modifier = Modifier
+                    .size(sizeDp * 0.22f)
+                    .align(Alignment.TopEnd)
+                    .background(Color(0xFFE53935), CircleShape)
+            )
         }
     }
 }

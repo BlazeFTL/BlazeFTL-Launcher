@@ -1,6 +1,7 @@
 package com.example.model
 
 import android.graphics.drawable.Drawable
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 
 data class AppItem(
@@ -9,6 +10,7 @@ data class AppItem(
     val label: String,
     val isSystemApp: Boolean = false,
     val iconDrawable: Drawable? = null,
+    val iconBitmap: ImageBitmap? = null,
     val iconVector: ImageVector? = null,
     val iconColor: Long = 0xFF4A90E2,
     val isThemed: Boolean = false,
@@ -86,7 +88,8 @@ data class LauncherSettings(
     val allowHomeScreenRotation: Boolean = false,
     val enableHapticOnRecents: Boolean = true,
     val launcherVibrationIntensity: Int = 0,
-    val actionToasts: Boolean = true
+    val actionToasts: Boolean = true,
+    val hiddenAppPackages: Set<String> = emptySet()
 )
 
 enum class LauncherScreen {

@@ -6,12 +6,16 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
+import android.graphics.Color as AndroidColor
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
@@ -63,7 +67,19 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT)
+        )
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+            window.isStatusBarContrastEnforced = false
+        }
+        window.navigationBarColor = AndroidColor.TRANSPARENT
+        window.statusBarColor = AndroidColor.TRANSPARENT
 
         prefsRepo = LauncherPreferencesRepository(applicationContext)
         appRepo = AppRepository(applicationContext)
@@ -287,9 +303,11 @@ fun SparkLauncherApp(
                     )
                 }
                 LauncherScreen.APP_DRAWER -> {
+                    val rawList = if (installedApps.isNotEmpty()) installedApps else homeAppsList
+                    val visibleApps = rawList.filterNot { settings.hiddenAppPackages.contains(it.packageName) }
                     AppDrawerScreen(
                         settings = settings,
-                        allApps = if (installedApps.isNotEmpty()) installedApps else homeAppsList,
+                        allApps = visibleApps,
                         onAppClick = { handleAppClick(it) },
                         onAddToHome = { addAppToHomeScreen(it) },
                         onOpenAppInfo = { appRepo.openAppInfo(it) },
@@ -353,6 +371,7 @@ fun SparkLauncherApp(
                 LauncherScreen.SETTINGS_MISCELLANEOUS -> {
                     MiscellaneousSettingsScreen(
                         settings = settings,
+                        allApps = if (installedApps.isNotEmpty()) installedApps else homeAppsList,
                         onUpdate = { prefsRepo.updateSettings(it) },
                         onRestartLauncher = {
                             currentScreen = LauncherScreen.HOME

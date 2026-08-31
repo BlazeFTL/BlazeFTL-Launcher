@@ -77,7 +77,8 @@ class LauncherPreferencesRepository(context: Context) {
             allowHomeScreenRotation = prefs.getBoolean("allowHomeScreenRotation", false),
             enableHapticOnRecents = prefs.getBoolean("enableHapticOnRecents", true),
             launcherVibrationIntensity = prefs.getInt("launcherVibrationIntensity", 0),
-            actionToasts = prefs.getBoolean("actionToasts", true)
+            actionToasts = prefs.getBoolean("actionToasts", true),
+            hiddenAppPackages = prefs.getStringSet("hiddenAppPackages", emptySet()) ?: emptySet()
         )
     }
 
@@ -146,6 +147,7 @@ class LauncherPreferencesRepository(context: Context) {
             putBoolean("enableHapticOnRecents", newSettings.enableHapticOnRecents)
             putInt("launcherVibrationIntensity", newSettings.launcherVibrationIntensity)
             putBoolean("actionToasts", newSettings.actionToasts)
+            putStringSet("hiddenAppPackages", newSettings.hiddenAppPackages)
             apply()
         }
     }

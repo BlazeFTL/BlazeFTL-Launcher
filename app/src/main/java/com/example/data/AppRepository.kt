@@ -11,6 +11,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import java.util.Locale
+import com.example.util.IconUtils
 import android.provider.Settings
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Calculate
@@ -63,11 +64,13 @@ class AppRepository(private val context: Context) {
 
                 val label = resolveInfo.loadLabel(packageManager).toString()
                 val iconDrawable = resolveInfo.loadIcon(packageManager)
+                val iconBitmap = IconUtils.drawableToImageBitmap(iconDrawable, packageName)
                 AppItem(
                     packageName = packageName,
                     activityName = resolveInfo.activityInfo.name,
                     label = label,
                     iconDrawable = iconDrawable,
+                    iconBitmap = iconBitmap,
                     isSystemApp = false
                 )
             } catch (e: Exception) {
@@ -92,12 +95,16 @@ class AppRepository(private val context: Context) {
         val phoneResolve = try { pm.resolveActivity(phoneIntent, PackageManager.MATCH_DEFAULT_ONLY) } catch (e: Exception) { null }
         if (phoneResolve != null && phoneResolve.activityInfo.packageName != "android") {
             try {
+                val pName = phoneResolve.activityInfo.packageName
+                val d = phoneResolve.loadIcon(pm)
+                val bmp = IconUtils.drawableToImageBitmap(d, pName)
                 dockList.add(
                     AppItem(
-                        packageName = phoneResolve.activityInfo.packageName,
+                        packageName = pName,
                         activityName = phoneResolve.activityInfo.name,
                         label = phoneResolve.loadLabel(pm).toString(),
-                        iconDrawable = phoneResolve.loadIcon(pm),
+                        iconDrawable = d,
+                        iconBitmap = bmp,
                         iconVector = Icons.Default.Phone,
                         iconColor = 0xFF2196F3
                     )
@@ -114,12 +121,16 @@ class AppRepository(private val context: Context) {
         val msgResolve = try { pm.resolveActivity(msgIntent, PackageManager.MATCH_DEFAULT_ONLY) } catch (e: Exception) { null }
         if (msgResolve != null && msgResolve.activityInfo.packageName != "android") {
             try {
+                val pName = msgResolve.activityInfo.packageName
+                val d = msgResolve.loadIcon(pm)
+                val bmp = IconUtils.drawableToImageBitmap(d, pName)
                 dockList.add(
                     AppItem(
-                        packageName = msgResolve.activityInfo.packageName,
+                        packageName = pName,
                         activityName = msgResolve.activityInfo.name,
                         label = msgResolve.loadLabel(pm).toString(),
-                        iconDrawable = msgResolve.loadIcon(pm),
+                        iconDrawable = d,
+                        iconBitmap = bmp,
                         iconVector = Icons.Outlined.Chat,
                         iconColor = 0xFF4CAF50
                     )
@@ -136,12 +147,16 @@ class AppRepository(private val context: Context) {
         val galleryResolve = try { pm.resolveActivity(galleryIntent, 0) } catch (e: Exception) { null }
         if (galleryResolve != null && galleryResolve.activityInfo.packageName != "android") {
             try {
+                val pName = galleryResolve.activityInfo.packageName
+                val d = galleryResolve.loadIcon(pm)
+                val bmp = IconUtils.drawableToImageBitmap(d, pName)
                 dockList.add(
                     AppItem(
-                        packageName = galleryResolve.activityInfo.packageName,
+                        packageName = pName,
                         activityName = galleryResolve.activityInfo.name,
                         label = galleryResolve.loadLabel(pm).toString(),
-                        iconDrawable = galleryResolve.loadIcon(pm),
+                        iconDrawable = d,
+                        iconBitmap = bmp,
                         iconVector = Icons.Outlined.Image,
                         iconColor = 0xFF26A69A
                     )
@@ -158,12 +173,16 @@ class AppRepository(private val context: Context) {
         val webResolve = try { pm.resolveActivity(webIntent, PackageManager.MATCH_DEFAULT_ONLY) } catch (e: Exception) { null }
         if (webResolve != null && webResolve.activityInfo.packageName != "android") {
             try {
+                val pName = webResolve.activityInfo.packageName
+                val d = webResolve.loadIcon(pm)
+                val bmp = IconUtils.drawableToImageBitmap(d, pName)
                 dockList.add(
                     AppItem(
-                        packageName = webResolve.activityInfo.packageName,
+                        packageName = pName,
                         activityName = webResolve.activityInfo.name,
                         label = webResolve.loadLabel(pm).toString(),
-                        iconDrawable = webResolve.loadIcon(pm),
+                        iconDrawable = d,
+                        iconBitmap = bmp,
                         iconVector = Icons.Default.Language,
                         iconColor = 0xFFFF7043
                     )
@@ -180,21 +199,25 @@ class AppRepository(private val context: Context) {
         val cameraResolve = try { pm.resolveActivity(cameraIntent, PackageManager.MATCH_DEFAULT_ONLY) } catch (e: Exception) { null }
         if (cameraResolve != null && cameraResolve.activityInfo.packageName != "android") {
             try {
+                val pName = cameraResolve.activityInfo.packageName
+                val d = cameraResolve.loadIcon(pm)
+                val bmp = IconUtils.drawableToImageBitmap(d, pName)
                 dockList.add(
                     AppItem(
-                        packageName = cameraResolve.activityInfo.packageName,
+                        packageName = pName,
                         activityName = cameraResolve.activityInfo.name,
                         label = cameraResolve.loadLabel(pm).toString(),
-                        iconDrawable = cameraResolve.loadIcon(pm),
+                        iconDrawable = d,
+                        iconBitmap = bmp,
                         iconVector = Icons.Default.CameraAlt,
-                        iconColor = 0xFF455A64
+                        iconColor = 0xFFE91E63
                     )
                 )
             } catch (e: Exception) {
-                dockList.add(AppItem("com.google.android.GoogleCamera", label = "Camera", iconVector = Icons.Default.CameraAlt, iconColor = 0xFF455A64))
+                dockList.add(AppItem("com.google.android.GoogleCamera", label = "Camera", iconVector = Icons.Default.CameraAlt, iconColor = 0xFFE91E63))
             }
         } else {
-            dockList.add(AppItem("com.google.android.GoogleCamera", label = "Camera", iconVector = Icons.Default.CameraAlt, iconColor = 0xFF455A64))
+            dockList.add(AppItem("com.google.android.GoogleCamera", label = "Camera", iconVector = Icons.Default.CameraAlt, iconColor = 0xFFE91E63))
         }
 
         return dockList.distinctBy { it.packageName }
