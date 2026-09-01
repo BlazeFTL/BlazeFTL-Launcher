@@ -4,7 +4,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,7 +44,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,13 +51,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -92,7 +87,7 @@ fun AppDrawerScreen(
     val focusManager = LocalFocusManager.current
 
     val filteredApps = remember(searchQuery, allApps) {
-        val baseList = if (searchQuery.isBlank()) {
+        if (searchQuery.isBlank()) {
             allApps
         } else {
             allApps.filter {
@@ -100,45 +95,35 @@ fun AppDrawerScreen(
                 it.packageName.contains(searchQuery, ignoreCase = true)
             }
         }
-        baseList.distinctBy { it.uniqueKey }
     }
 
     val overlayAlpha = (settings.drawerBackgroundOpacity / 100f).coerceIn(0.2f, 0.95f)
     val gridState = rememberLazyGridState()
-
-    val isAtTop by remember {
-        derivedStateOf {
-            gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
-        }
-    }
-
-    var accumulatedPullDown by remember { mutableStateOf(0f) }
-
-    val nestedScrollConnection = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (isAtTop && available.y > 0 && source == NestedScrollSource.UserInput) {
-                    accumulatedPullDown += available.y
-                    if (accumulatedPullDown > 120f) {
-                        accumulatedPullDown = 0f
-                        onCloseDrawer()
-                    }
-                } else if (available.y < 0) {
-                    accumulatedPullDown = 0f
-                }
-                return Offset.Zero
-            }
-        }
-    }
-
     val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
+    var dragOffsetY by remember { mutableStateOf(0f) }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .nestedScroll(nestedScrollConnection)
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onVerticalDrag = { _, dragAmount ->
+                        if (dragAmount > 0) {
+                            dragOffsetY += dragAmount
+                            if (dragOffsetY > 45f && gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0) {
+                                dragOffsetY = 0f
+                                onCloseDrawer()
+                            }
+                        } else {
+                            dragOffsetY = 0f
+                        }
+                    },
+                    onDragEnd = { dragOffsetY = 0f }
+                )
+            }
     ) {
-        // Translucent overlay over the system wallpaper
+        // Translucent overlay over the system wallpaper (SS 1)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -162,7 +147,7 @@ fun AppDrawerScreen(
                     modifier = Modifier
                         .size(width = 44.dp, height = 5.dp)
                         .clip(RoundedCornerShape(3.dp))
-                        .background(Color.White.copy(alpha = 0.5f))
+                        .background(Color.White.copy(alpha = 0.55f))
                 )
             }
 
@@ -271,21 +256,21 @@ fun AppDrawerScreen(
             val iconScale = (settings.iconSizePercent / 100f).coerceIn(0.6f, 1.4f)
             val iconBaseDp = (48 * iconScale).dp
             val rowHeightMultiplier = (settings.drawerRowHeight / 75f).coerceIn(0.6f, 1.3f)
-            val verticalSpacing = (16 * rowHeightMultiplier).dp
+            val verticalSpacing = (14 * rowHeightMultiplier).dp
             val fontSizeSp = (11.5f * (settings.fontSizePercent / 100f)).sp
-            val bottomPadding = navBarBottomPadding + 16.dp
+            val bottomPadding = navBarBottomPadding + 20.dp
 
             LazyVerticalGrid(
                 state = gridState,
                 columns = GridCells.Fixed(6),
                 contentPadding = PaddingValues(
-                    start = 6.dp,
-                    end = 6.dp,
+                    start = 4.dp,
+                    end = 4.dp,
                     top = 8.dp,
                     bottom = bottomPadding
                 ),
                 verticalArrangement = Arrangement.spacedBy(verticalSpacing),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 4.dp)
@@ -415,19 +400,14 @@ fun DrawerAppItemView(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
             .combinedClickable(
-                interactionSource = interactionSource,
-                indication = null,
                 onClick = onClick,
                 onLongClick = onLongClick
             )
-            .padding(vertical = 4.dp)
+            .padding(vertical = 2.dp)
     ) {
         AppIconBadge(
             app = app,
@@ -435,7 +415,7 @@ fun DrawerAppItemView(
             forceMonochrome = forceMonochrome
         )
         if (showLabel) {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = app.label,
                 color = Color.White,

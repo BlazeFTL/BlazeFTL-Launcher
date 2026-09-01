@@ -349,11 +349,14 @@ fun AppIconBadge(
     showNotificationDot: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val realBitmap = app.iconBitmap ?: remember(app.iconDrawable, app.packageName) {
-        IconUtils.drawableToImageBitmap(app.iconDrawable, app.packageName)
+    val realBitmap = app.iconBitmap ?: app.iconDrawable?.let {
+        remember(app.packageName) { IconUtils.drawableToImageBitmap(it, app.packageName) }
     }
 
-    Box(modifier = modifier.size(sizeDp)) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = modifier.size(sizeDp)
+    ) {
         if (realBitmap != null) {
             if (forceMonochrome) {
                 Box(
@@ -361,11 +364,10 @@ fun AppIconBadge(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(Color(0xFFE2E8F0), CircleShape)
-                        .clip(CircleShape)
                 ) {
                     Image(
                         bitmap = realBitmap,
-                        contentDescription = app.label,
+                        contentDescription = null,
                         colorFilter = ColorFilter.tint(Color(0xFF1E293B)),
                         modifier = Modifier.size(sizeDp * 0.65f)
                     )
@@ -373,10 +375,8 @@ fun AppIconBadge(
             } else {
                 Image(
                     bitmap = realBitmap,
-                    contentDescription = app.label,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         } else {
@@ -387,23 +387,19 @@ fun AppIconBadge(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(
-                        color = bg,
-                        shape = CircleShape
-                    )
-                    .clip(CircleShape)
+                    .background(color = bg, shape = CircleShape)
             ) {
                 if (app.iconVector != null) {
                     Icon(
                         imageVector = app.iconVector,
-                        contentDescription = app.label,
+                        contentDescription = null,
                         tint = tint,
                         modifier = Modifier.size(sizeDp * 0.58f)
                     )
                 } else {
                     Text(
                         text = app.label.take(1).uppercase(),
-                        fontSize = (sizeDp.value * 0.45f).sp,
+                        fontSize = (sizeDp.value * 0.44f).sp,
                         fontWeight = FontWeight.Bold,
                         color = tint
                     )

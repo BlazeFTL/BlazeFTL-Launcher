@@ -26,8 +26,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.togetherWith
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -285,8 +288,22 @@ fun SparkLauncherApp(
         }
     }
 
+    val isDrawerOpen = currentScreen == LauncherScreen.APP_DRAWER
+    val drawerProgress by animateFloatAsState(
+        targetValue = if (isDrawerOpen) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = 0.82f,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "DrawerAnimation"
+    )
+
+    BackHandler(enabled = isDrawerOpen) {
+        currentScreen = LauncherScreen.HOME
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
-        // Base Home Screen (always stays mounted for zero-lag drawer open/close)
+        // Base Home Screen (always mounted, fades cleanly as drawer slides in)
         HomeScreen(
             settings = settings,
             homeApps = homeAppsList,
@@ -304,15 +321,18 @@ fun SparkLauncherApp(
             onUninstallApp = { appRepo.uninstallApp(it) },
             onRemoveFromHome = { removeAppFromHomeScreen(it) },
             onExpandQuickSettings = { appRepo.expandQuickSettings() },
-            onShowToast = { showToast(it) }
+            onShowToast = { showToast(it) },
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    alpha = (1f - drawerProgress * 2f).coerceIn(0f, 1f)
+                    scaleX = 1f - (drawerProgress * 0.05f)
+                    scaleY = 1f - (drawerProgress * 0.05f)
+                }
         )
 
-        // App Drawer Sliding Overlay
-        AnimatedVisibility(
-            visible = currentScreen == LauncherScreen.APP_DRAWER,
-            enter = slideInVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(160)),
-            exit = slideOutVertically(animationSpec = tween(180, easing = FastOutLinearInEasing)) { it } + fadeOut(tween(140))
-        ) {
+        // App Drawer Sliding Overlay (Hardware accelerated with zero jank/delay)
+        if (drawerProgress > 0.001f || isDrawerOpen) {
             AppDrawerScreen(
                 settings = settings,
                 allApps = visibleDrawerApps,
@@ -321,7 +341,13 @@ fun SparkLauncherApp(
                 onOpenAppInfo = { appRepo.openAppInfo(it) },
                 onUninstallApp = { appRepo.uninstallApp(it) },
                 onCloseDrawer = { currentScreen = LauncherScreen.HOME },
-                onShowToast = { showToast(it) }
+                onShowToast = { showToast(it) },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        translationY = (1f - drawerProgress) * size.height
+                        alpha = drawerProgress.coerceIn(0f, 1f)
+                    }
             )
         }
 
