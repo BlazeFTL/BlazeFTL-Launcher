@@ -273,6 +273,14 @@ class AppRepository(private val context: Context) {
 
     fun launchApp(packageName: String, activityName: String? = null): Boolean {
         return try {
+            if (packageName == "com.android.settings") {
+                val settingsIntent = Intent(Settings.ACTION_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(settingsIntent)
+                return true
+            }
+
             val intent = if (!activityName.isNullOrBlank()) {
                 Intent(Intent.ACTION_MAIN).apply {
                     addCategory(Intent.CATEGORY_LAUNCHER)
@@ -291,7 +299,19 @@ class AppRepository(private val context: Context) {
                 false
             }
         } catch (e: Exception) {
-            false
+            try {
+                val fallbackIntent = context.packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                if (fallbackIntent != null) {
+                    context.startActivity(fallbackIntent)
+                    true
+                } else {
+                    false
+                }
+            } catch (e2: Exception) {
+                false
+            }
         }
     }
 

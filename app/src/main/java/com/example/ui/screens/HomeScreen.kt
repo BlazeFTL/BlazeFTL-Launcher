@@ -321,26 +321,28 @@ fun QuickspaceWidget(
 
     val widgetShadow = remember {
         Shadow(
-            color = Color.Black.copy(alpha = 0.55f),
-            offset = Offset(1.5f, 2.5f),
-            blurRadius = 6f
+            color = Color.Black.copy(alpha = 0.45f),
+            offset = Offset(0f, 2f),
+            blurRadius = 8f
         )
     }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
+            .clickable(
+                indication = null,
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            ) { onSongClick() }
             .padding(vertical = 4.dp)
     ) {
         if (settings.nowPlaying && isMusicPlaying) {
-            // Modern Glassmorphic Now Playing Card
+            // Sleek Modern Now Playing Pill
             Surface(
-                shape = RoundedCornerShape(22.dp),
+                shape = RoundedCornerShape(24.dp),
                 color = Color.Black.copy(alpha = 0.35f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onSongClick() }
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -349,18 +351,18 @@ fun QuickspaceWidget(
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .size(40.dp)
-                            .background(Color(0xFFE85D54).copy(alpha = 0.25f), CircleShape)
+                            .size(38.dp)
+                            .background(Color(0xFFE85D54).copy(alpha = 0.3f), CircleShape)
                     ) {
                         Icon(
                             imageVector = Icons.Default.MusicNote,
                             contentDescription = "Now Playing",
                             tint = Color(0xFFFF8A80),
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(14.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -375,7 +377,7 @@ fun QuickspaceWidget(
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "by ${currentSong.second}",
-                            color = Color.White.copy(alpha = 0.8f),
+                            color = Color.White.copy(alpha = 0.82f),
                             fontSize = 13.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -389,96 +391,78 @@ fun QuickspaceWidget(
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(3.dp),
                         verticalAlignment = Alignment.Bottom,
-                        modifier = Modifier.height(18.dp)
+                        modifier = Modifier.height(16.dp)
                     ) {
-                        Box(modifier = Modifier.width(3.dp).height(12.dp).background(Color(0xFFFF8A80), RoundedCornerShape(2.dp)))
-                        Box(modifier = Modifier.width(3.dp).height(18.dp).background(Color(0xFFFF8A80), RoundedCornerShape(2.dp)))
-                        Box(modifier = Modifier.width(3.dp).height(8.dp).background(Color(0xFFFF8A80), RoundedCornerShape(2.dp)))
+                        Box(modifier = Modifier.width(3.dp).height(10.dp).background(Color(0xFFFF8A80), RoundedCornerShape(2.dp)))
+                        Box(modifier = Modifier.width(3.dp).height(16.dp).background(Color(0xFFFF8A80), RoundedCornerShape(2.dp)))
+                        Box(modifier = Modifier.width(3.dp).height(7.dp).background(Color(0xFFFF8A80), RoundedCornerShape(2.dp)))
                     }
                 }
             }
         } else {
-            // Modern High-End Date & Clock Widget
+            // Elegant Pixel-Style At-A-Glance Layout
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onSongClick() }
+                modifier = Modifier.fillMaxWidth()
             ) {
-                // Large Modern Clock Typography
-                Row(
-                    verticalAlignment = Alignment.Bottom,
-                    modifier = Modifier.padding(bottom = 6.dp)
-                ) {
-                    Text(
-                        text = currentHourMinute,
-                        color = Color.White,
-                        fontSize = 46.sp,
-                        fontWeight = FontWeight.Light,
-                        letterSpacing = (-1).sp,
-                        style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .padding(bottom = 8.dp)
-                            .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = currentAmPm.uppercase(),
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
-                        )
-                    }
-                }
-
-                // Modern At-A-Glance Capsule Row: Date & Weather
+                // Line 1: Date & Weather (Authentic Pixel At-A-Glance Header)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                    modifier = Modifier.padding(bottom = 2.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.CalendarToday,
-                        contentDescription = "Date",
-                        tint = Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "$currentDayOfWeek, $currentMonthDay",
                         color = Color.White,
-                        fontSize = 14.sp,
+                        fontSize = 21.sp,
                         fontWeight = FontWeight.Medium,
+                        letterSpacing = (-0.2).sp,
                         style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
                     )
 
                     if (settings.weatherCondition) {
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .background(Color.White.copy(alpha = 0.5f), CircleShape)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "•",
+                            color = Color.White.copy(alpha = 0.7f),
+                            fontSize = 16.sp,
+                            style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Icon(
                             imageVector = Icons.Outlined.WbSunny,
                             contentDescription = "Weather",
                             tint = Color(0xFFFFD54F),
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(5.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (settings.detailedWeather) "24°C • Sunny" else "24°C",
+                            text = if (settings.detailedWeather) "24°C Sunny" else "24°C",
                             color = Color.White.copy(alpha = 0.95f),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Normal,
                             style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
                         )
                     }
+                }
+
+                // Line 2: Subtle Time & Status Bar
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 2.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Schedule,
+                        contentDescription = "Clock",
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = "$currentHourMinute $currentAmPm",
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Normal,
+                        style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
+                    )
                 }
             }
         }

@@ -17,6 +17,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
 import android.graphics.Color as AndroidColor
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -249,11 +250,7 @@ fun SparkLauncherApp(
         if (settings.enableHapticOnRecents) {
             appRepo.triggerHapticFeedback(settings.launcherVibrationIntensity)
         }
-        if (app.packageName == "com.android.settings") {
-            currentScreen = LauncherScreen.SETTINGS_MAIN
-            return
-        }
-        val launched = appRepo.launchApp(app.packageName)
+        val launched = appRepo.launchApp(app.packageName, app.activityName)
         if (!launched) {
             showToast("Opening ${app.label}")
         }
@@ -280,130 +277,127 @@ fun SparkLauncherApp(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        AnimatedContent(
-            targetState = currentScreen,
-            transitionSpec = {
-                when {
-                    // Home -> App Drawer: smooth upward slide & fade
-                    initialState == LauncherScreen.HOME && targetState == LauncherScreen.APP_DRAWER ->
-                        (slideInVertically(animationSpec = tween(260, easing = FastOutSlowInEasing)) { (it * 0.25f).toInt() } + fadeIn(tween(180)))
-                            .togetherWith(fadeOut(animationSpec = tween(120)))
-
-                    // App Drawer -> Home: smooth downward return
-                    initialState == LauncherScreen.APP_DRAWER && targetState == LauncherScreen.HOME ->
-                        fadeIn(animationSpec = tween(160))
-                            .togetherWith(slideOutVertically(animationSpec = tween(240, easing = FastOutSlowInEasing)) { (it * 0.25f).toInt() } + fadeOut(tween(160)))
-
-                    targetState == LauncherScreen.RECENTS_OVERVIEW || initialState == LauncherScreen.RECENTS_OVERVIEW ->
-                        (slideInHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { -it / 3 } + fadeIn(tween(200)))
-                            .togetherWith(slideOutHorizontally(animationSpec = tween(220, easing = FastOutLinearInEasing)) { it / 3 } + fadeOut(tween(160)))
-
-                    else ->
-                        (slideInHorizontally(animationSpec = tween(260, easing = FastOutSlowInEasing)) { it / 3 } + fadeIn(tween(200)))
-                            .togetherWith(slideOutHorizontally(animationSpec = tween(220, easing = FastOutLinearInEasing)) { -it / 3 } + fadeOut(tween(160)))
-                }
+        // Base Home Screen (always stays mounted for zero-lag drawer open/close)
+        HomeScreen(
+            settings = settings,
+            homeApps = homeAppsList,
+            dockApps = dockApps,
+            isMusicPlaying = isAudioPlaying,
+            onAppClick = { handleAppClick(it) },
+            onOpenDrawer = { currentScreen = LauncherScreen.APP_DRAWER },
+            onOpenRecents = {
+                memoryInfoText = appRepo.getFormattedMemoryInfo()
+                currentScreen = LauncherScreen.RECENTS_OVERVIEW
             },
-            label = "ScreenTransition"
-        ) { screen ->
-            when (screen) {
-                LauncherScreen.HOME -> {
-                    HomeScreen(
-                        settings = settings,
-                        homeApps = homeAppsList,
-                        dockApps = dockApps,
-                        isMusicPlaying = isAudioPlaying,
-                        onAppClick = { handleAppClick(it) },
-                        onOpenDrawer = { currentScreen = LauncherScreen.APP_DRAWER },
-                        onOpenRecents = {
-                            memoryInfoText = appRepo.getFormattedMemoryInfo()
-                            currentScreen = LauncherScreen.RECENTS_OVERVIEW
-                        },
-                        onOpenSettings = { currentScreen = LauncherScreen.SETTINGS_MAIN },
-                        onOpenWallpaper = { appRepo.openWallpaperPicker() },
-                        onOpenAppInfo = { appRepo.openAppInfo(it) },
-                        onUninstallApp = { appRepo.uninstallApp(it) },
-                        onRemoveFromHome = { removeAppFromHomeScreen(it) },
-                        onExpandQuickSettings = { appRepo.expandQuickSettings() },
-                        onShowToast = { showToast(it) }
-                    )
-                }
-                LauncherScreen.APP_DRAWER -> {
-                    val rawList = if (installedApps.isNotEmpty()) installedApps else homeAppsList
-                    val visibleApps = rawList.filterNot { settings.hiddenAppPackages.contains(it.packageName) }
-                    AppDrawerScreen(
-                        settings = settings,
-                        allApps = visibleApps,
-                        onAppClick = { handleAppClick(it) },
-                        onAddToHome = { addAppToHomeScreen(it) },
-                        onOpenAppInfo = { appRepo.openAppInfo(it) },
-                        onUninstallApp = { appRepo.uninstallApp(it) },
-                        onCloseDrawer = { currentScreen = LauncherScreen.HOME },
-                        onShowToast = { showToast(it) }
-                    )
-                }
-                LauncherScreen.RECENTS_OVERVIEW -> {
-                    RecentsOverviewScreen(
-                        settings = settings,
-                        recentApps = if (homeAppsList.isNotEmpty()) homeAppsList.take(6) else appRepo.getHomeScreenApps().take(6),
-                        memoryInfo = memoryInfoText,
-                        onClose = { currentScreen = LauncherScreen.HOME },
-                        onAppClick = { handleAppClick(it) },
-                        onKillProcess = { appRepo.killBackgroundProcesses(it) },
-                        onShowToast = { showToast(it) }
-                    )
-                }
-                LauncherScreen.SETTINGS_MAIN -> {
-                    HomeSettingsMainScreen(
-                        onNavigate = { currentScreen = it },
-                        onBack = { currentScreen = LauncherScreen.HOME }
-                    )
-                }
-                LauncherScreen.SETTINGS_ICONS -> {
-                    IconsSettingsScreen(
-                        settings = settings,
-                        onUpdate = { prefsRepo.updateSettings(it) },
-                        onBack = { currentScreen = LauncherScreen.SETTINGS_MAIN }
-                    )
-                }
-                LauncherScreen.SETTINGS_HOME_SCREEN -> {
-                    HomeScreenSettingsScreen(
-                        settings = settings,
-                        onUpdate = { prefsRepo.updateSettings(it) },
-                        onBack = { currentScreen = LauncherScreen.SETTINGS_MAIN }
-                    )
-                }
-                LauncherScreen.SETTINGS_GESTURES -> {
-                    GesturesSettingsScreen(
-                        settings = settings,
-                        onUpdate = { prefsRepo.updateSettings(it) },
-                        onBack = { currentScreen = LauncherScreen.SETTINGS_MAIN }
-                    )
-                }
-                LauncherScreen.SETTINGS_APP_DRAWER -> {
-                    AppDrawerSettingsScreen(
-                        settings = settings,
-                        onUpdate = { prefsRepo.updateSettings(it) },
-                        onBack = { currentScreen = LauncherScreen.SETTINGS_MAIN }
-                    )
-                }
-                LauncherScreen.SETTINGS_RECENTS -> {
-                    RecentsSettingsScreen(
-                        settings = settings,
-                        onUpdate = { prefsRepo.updateSettings(it) },
-                        onBack = { currentScreen = LauncherScreen.SETTINGS_MAIN }
-                    )
-                }
-                LauncherScreen.SETTINGS_MISCELLANEOUS -> {
-                    MiscellaneousSettingsScreen(
-                        settings = settings,
-                        allApps = if (installedApps.isNotEmpty()) installedApps else homeAppsList,
-                        onUpdate = { prefsRepo.updateSettings(it) },
-                        onRestartLauncher = {
-                            currentScreen = LauncherScreen.HOME
-                            showToast("Spark Launcher reloaded")
-                        },
-                        onBack = { currentScreen = LauncherScreen.SETTINGS_MAIN }
-                    )
+            onOpenSettings = { currentScreen = LauncherScreen.SETTINGS_MAIN },
+            onOpenWallpaper = { appRepo.openWallpaperPicker() },
+            onOpenAppInfo = { appRepo.openAppInfo(it) },
+            onUninstallApp = { appRepo.uninstallApp(it) },
+            onRemoveFromHome = { removeAppFromHomeScreen(it) },
+            onExpandQuickSettings = { appRepo.expandQuickSettings() },
+            onShowToast = { showToast(it) }
+        )
+
+        // App Drawer Sliding Overlay
+        AnimatedVisibility(
+            visible = currentScreen == LauncherScreen.APP_DRAWER,
+            enter = slideInVertically(animationSpec = tween(240, easing = FastOutSlowInEasing)) { (it * 0.35f).toInt() } + fadeIn(tween(180)),
+            exit = slideOutVertically(animationSpec = tween(200, easing = FastOutLinearInEasing)) { (it * 0.35f).toInt() } + fadeOut(tween(160))
+        ) {
+            val rawList = if (installedApps.isNotEmpty()) installedApps else homeAppsList
+            val visibleApps = rawList.filterNot { settings.hiddenAppPackages.contains(it.packageName) }
+            AppDrawerScreen(
+                settings = settings,
+                allApps = visibleApps,
+                onAppClick = { handleAppClick(it) },
+                onAddToHome = { addAppToHomeScreen(it) },
+                onOpenAppInfo = { appRepo.openAppInfo(it) },
+                onUninstallApp = { appRepo.uninstallApp(it) },
+                onCloseDrawer = { currentScreen = LauncherScreen.HOME },
+                onShowToast = { showToast(it) }
+            )
+        }
+
+        // Overlay for Settings and Recents screens
+        AnimatedVisibility(
+            visible = currentScreen != LauncherScreen.HOME && currentScreen != LauncherScreen.APP_DRAWER,
+            enter = fadeIn(tween(180)),
+            exit = fadeOut(tween(150))
+        ) {
+            AnimatedContent(
+                targetState = currentScreen,
+                transitionSpec = {
+                    (slideInHorizontally(animationSpec = tween(220, easing = FastOutSlowInEasing)) { it / 4 } + fadeIn(tween(180)))
+                        .togetherWith(slideOutHorizontally(animationSpec = tween(180, easing = FastOutLinearInEasing)) { -it / 4 } + fadeOut(tween(140)))
+                },
+                label = "SettingsRecentsTransition"
+            ) { screen ->
+                when (screen) {
+                    LauncherScreen.RECENTS_OVERVIEW -> {
+                        RecentsOverviewScreen(
+                            settings = settings,
+                            recentApps = if (homeAppsList.isNotEmpty()) homeAppsList.take(6) else appRepo.getHomeScreenApps().take(6),
+                            memoryInfo = memoryInfoText,
+                            onClose = { currentScreen = LauncherScreen.HOME },
+                            onAppClick = { handleAppClick(it) },
+                            onKillProcess = { appRepo.killBackgroundProcesses(it) },
+                            onShowToast = { showToast(it) }
+                        )
+                    }
+                    LauncherScreen.SETTINGS_MAIN -> {
+                        HomeSettingsMainScreen(
+                            onNavigate = { currentScreen = it },
+                            onBack = { currentScreen = LauncherScreen.HOME }
+                        )
+                    }
+                    LauncherScreen.SETTINGS_ICONS -> {
+                        IconsSettingsScreen(
+                            settings = settings,
+                            onUpdate = { prefsRepo.updateSettings(it) },
+                            onBack = { currentScreen = LauncherScreen.SETTINGS_MAIN }
+                        )
+                    }
+                    LauncherScreen.SETTINGS_HOME_SCREEN -> {
+                        HomeScreenSettingsScreen(
+                            settings = settings,
+                            onUpdate = { prefsRepo.updateSettings(it) },
+                            onBack = { currentScreen = LauncherScreen.SETTINGS_MAIN }
+                        )
+                    }
+                    LauncherScreen.SETTINGS_GESTURES -> {
+                        GesturesSettingsScreen(
+                            settings = settings,
+                            onUpdate = { prefsRepo.updateSettings(it) },
+                            onBack = { currentScreen = LauncherScreen.SETTINGS_MAIN }
+                        )
+                    }
+                    LauncherScreen.SETTINGS_APP_DRAWER -> {
+                        AppDrawerSettingsScreen(
+                            settings = settings,
+                            onUpdate = { prefsRepo.updateSettings(it) },
+                            onBack = { currentScreen = LauncherScreen.SETTINGS_MAIN }
+                        )
+                    }
+                    LauncherScreen.SETTINGS_RECENTS -> {
+                        RecentsSettingsScreen(
+                            settings = settings,
+                            onUpdate = { prefsRepo.updateSettings(it) },
+                            onBack = { currentScreen = LauncherScreen.SETTINGS_MAIN }
+                        )
+                    }
+                    LauncherScreen.SETTINGS_MISCELLANEOUS -> {
+                        MiscellaneousSettingsScreen(
+                            settings = settings,
+                            allApps = if (installedApps.isNotEmpty()) installedApps else homeAppsList,
+                            onUpdate = { prefsRepo.updateSettings(it) },
+                            onRestartLauncher = {
+                                currentScreen = LauncherScreen.HOME
+                                showToast("Spark Launcher reloaded")
+                            },
+                            onBack = { currentScreen = LauncherScreen.SETTINGS_MAIN }
+                        )
+                    }
+                    else -> Unit
                 }
             }
         }
