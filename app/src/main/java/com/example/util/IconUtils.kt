@@ -9,7 +9,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 
 object IconUtils {
-    private val iconCache = LruCache<String, ImageBitmap>(500)
+    private val iconCache = LruCache<String, ImageBitmap>(800)
 
     fun drawableToImageBitmap(drawable: Drawable?, cacheKey: String? = null): ImageBitmap? {
         if (drawable == null) return null
@@ -19,15 +19,19 @@ object IconUtils {
             if (cached != null) return cached
         }
 
+        val targetSize = 144
         val bitmap = try {
             if (drawable is BitmapDrawable && drawable.bitmap != null && !drawable.bitmap.isRecycled) {
-                drawable.bitmap
+                val src = drawable.bitmap
+                if (src.width <= targetSize && src.height <= targetSize) {
+                    src
+                } else {
+                    Bitmap.createScaledBitmap(src, targetSize, targetSize, true)
+                }
             } else {
-                val width = if (drawable.intrinsicWidth in 1..256) drawable.intrinsicWidth else 144
-                val height = if (drawable.intrinsicHeight in 1..256) drawable.intrinsicHeight else 144
-                val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                val bmp = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
                 val canvas = Canvas(bmp)
-                drawable.setBounds(0, 0, canvas.width, canvas.height)
+                drawable.setBounds(0, 0, targetSize, targetSize)
                 drawable.draw(canvas)
                 bmp
             }

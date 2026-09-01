@@ -122,6 +122,15 @@ fun SparkLauncherApp(
     
     val homeAppsList = remember { mutableStateListOf<AppItem>() }
 
+    val visibleDrawerApps = remember(installedApps, homeAppsList.toList(), settings.hiddenAppPackages) {
+        val rawList = if (installedApps.isNotEmpty()) installedApps else homeAppsList.toList()
+        if (settings.hiddenAppPackages.isEmpty()) {
+            rawList
+        } else {
+            rawList.filterNot { settings.hiddenAppPackages.contains(it.packageName) }
+        }
+    }
+
     var memoryInfoText by remember { mutableStateOf("") }
     var toastMessage by remember { mutableStateOf("") }
     var isToastVisible by remember { mutableStateOf(false) }
@@ -301,14 +310,12 @@ fun SparkLauncherApp(
         // App Drawer Sliding Overlay
         AnimatedVisibility(
             visible = currentScreen == LauncherScreen.APP_DRAWER,
-            enter = slideInVertically(animationSpec = tween(240, easing = FastOutSlowInEasing)) { (it * 0.35f).toInt() } + fadeIn(tween(180)),
-            exit = slideOutVertically(animationSpec = tween(200, easing = FastOutLinearInEasing)) { (it * 0.35f).toInt() } + fadeOut(tween(160))
+            enter = slideInVertically(animationSpec = tween(220, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(160)),
+            exit = slideOutVertically(animationSpec = tween(180, easing = FastOutLinearInEasing)) { it } + fadeOut(tween(140))
         ) {
-            val rawList = if (installedApps.isNotEmpty()) installedApps else homeAppsList
-            val visibleApps = rawList.filterNot { settings.hiddenAppPackages.contains(it.packageName) }
             AppDrawerScreen(
                 settings = settings,
-                allApps = visibleApps,
+                allApps = visibleDrawerApps,
                 onAppClick = { handleAppClick(it) },
                 onAddToHome = { addAppToHomeScreen(it) },
                 onOpenAppInfo = { appRepo.openAppInfo(it) },

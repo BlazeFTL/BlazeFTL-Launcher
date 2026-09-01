@@ -3,10 +3,13 @@ package com.example.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -124,10 +127,10 @@ fun HomeScreen(
             .draggable(
                 state = rememberDraggableState { delta ->
                     totalDragY += delta
-                    if (totalDragY < -70f) {
+                    if (totalDragY < -30f) {
                         totalDragY = 0f
                         onOpenDrawer()
-                    } else if (totalDragY > 70f) {
+                    } else if (totalDragY > 50f) {
                         totalDragY = 0f
                         onExpandQuickSettings()
                     }
@@ -469,6 +472,7 @@ fun QuickspaceWidget(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DesktopAppIcon(
     app: AppItem,
@@ -481,16 +485,18 @@ fun DesktopAppIcon(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .pointerInput(app.uniqueKey) {
-                detectTapGestures(
-                    onTap = { onClick() },
-                    onLongPress = { onLongClick() }
-                )
-            }
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .padding(vertical = 4.dp)
     ) {
         AppIconBadge(

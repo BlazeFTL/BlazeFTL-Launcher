@@ -1,59 +1,46 @@
 package com.example.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -66,24 +53,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
+import androidx.compose.ui.window.Dialog
 import com.example.model.AppItem
 import com.example.model.LauncherSettings
 import com.example.ui.components.AppIconBadge
@@ -117,38 +104,34 @@ fun AppDrawerScreen(
     }
 
     val overlayAlpha = (settings.drawerBackgroundOpacity / 100f).coerceIn(0.2f, 0.95f)
-
     val gridState = rememberLazyGridState()
+
     val isAtTop by remember {
         derivedStateOf {
             gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
         }
     }
 
+    var accumulatedPullDown by remember { mutableStateOf(0f) }
+
     val nestedScrollConnection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // When dragging down while already at the top of the grid, dismiss on single pull
-                if (isAtTop && available.y > 15f && source == NestedScrollSource.UserInput) {
-                    onCloseDrawer()
-                    return available
-                }
-                return Offset.Zero
-            }
-
-            override fun onPostScroll(
-                consumed: Offset,
-                available: Offset,
-                source: NestedScrollSource
-            ): Offset {
-                if (available.y > 10f && source == NestedScrollSource.UserInput) {
-                    onCloseDrawer()
-                    return available
+                if (isAtTop && available.y > 0 && source == NestedScrollSource.UserInput) {
+                    accumulatedPullDown += available.y
+                    if (accumulatedPullDown > 120f) {
+                        accumulatedPullDown = 0f
+                        onCloseDrawer()
+                    }
+                } else if (available.y < 0) {
+                    accumulatedPullDown = 0f
                 }
                 return Offset.Zero
             }
         }
     }
+
+    val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     Box(
         modifier = modifier
@@ -166,9 +149,8 @@ fun AppDrawerScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .navigationBarsPadding()
         ) {
-            // Drag Down Close Handle & Header
+            // Drag Down Close Handle
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -184,12 +166,12 @@ fun AppDrawerScreen(
                 )
             }
 
-            // Top Search Bar
+            // Top Search Bar (Matches SS 1)
             if (settings.appSearchBar) {
                 Surface(
                     shape = RoundedCornerShape(28.dp),
                     color = Color(0xEEFFFFFF),
-                    shadowElevation = 4.dp,
+                    shadowElevation = 3.dp,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(54.dp)
@@ -260,9 +242,9 @@ fun AppDrawerScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // App Count / Status info
+            // App Count / Status info Header
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
@@ -285,23 +267,27 @@ fun AppDrawerScreen(
                 )
             }
 
-            // Grid of all apps (6 columns)
+            // Grid of all apps (6 columns, scrolls seamlessly behind navigation keys like SS 1)
             val iconScale = (settings.iconSizePercent / 100f).coerceIn(0.6f, 1.4f)
             val iconBaseDp = (48 * iconScale).dp
             val rowHeightMultiplier = (settings.drawerRowHeight / 75f).coerceIn(0.6f, 1.3f)
             val verticalSpacing = (16 * rowHeightMultiplier).dp
             val fontSizeSp = (11.5f * (settings.fontSizePercent / 100f)).sp
+            val bottomPadding = navBarBottomPadding + 16.dp
 
             LazyVerticalGrid(
                 state = gridState,
                 columns = GridCells.Fixed(6),
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(
+                    start = 6.dp,
+                    end = 6.dp,
+                    top = 8.dp,
+                    bottom = bottomPadding
+                ),
                 verticalArrangement = Arrangement.spacedBy(verticalSpacing),
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .nestedScroll(nestedScrollConnection)
+                    .fillMaxSize()
                     .padding(horizontal = 4.dp)
             ) {
                 items(
@@ -318,24 +304,6 @@ fun AppDrawerScreen(
                         forceMonochrome = settings.forceMonochrome && settings.themedIconsInDrawer,
                         onClick = { onAppClick(app) },
                         onLongClick = { selectedAppForPopup = app }
-                    )
-                }
-            }
-
-            // Bottom quick navigation bar
-            Row(
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-            ) {
-                IconButton(onClick = onCloseDrawer) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = "Close drawer",
-                        tint = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
@@ -434,11 +402,12 @@ fun AppDrawerScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DrawerAppItemView(
     app: AppItem,
-    iconSizeDp: androidx.compose.ui.unit.Dp,
-    fontSizeSp: androidx.compose.ui.unit.TextUnit,
+    iconSizeDp: Dp,
+    fontSizeSp: TextUnit,
     showLabel: Boolean,
     maxLines: Int,
     forceMonochrome: Boolean,
@@ -446,16 +415,18 @@ fun DrawerAppItemView(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .pointerInput(app.uniqueKey) {
-                detectTapGestures(
-                    onTap = { onClick() },
-                    onLongPress = { onLongClick() }
-                )
-            }
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
             .padding(vertical = 4.dp)
     ) {
         AppIconBadge(
