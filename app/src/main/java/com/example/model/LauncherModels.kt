@@ -69,7 +69,7 @@ data class LauncherSettings(
     val appSearchBar: Boolean = true,
     val iconLabelsInDrawer: Boolean = true,
     val drawerRowHeight: Int = 75,
-    val drawerBackgroundOpacity: Int = 80,
+    val drawerBackgroundOpacity: Int = 30,
 
     // Gestures
     val shakeGestureAction: Int = 0,

@@ -351,6 +351,8 @@ fun AppIconBadge(
 ) {
     val realBitmap = app.iconBitmap ?: app.iconDrawable?.let {
         remember(app.packageName) { IconUtils.drawableToImageBitmap(it, app.packageName) }
+    } ?: remember(app.label, app.iconColor) {
+        IconUtils.getFallbackAppIcon(app.label, app.iconColor)
     }
 
     Box(

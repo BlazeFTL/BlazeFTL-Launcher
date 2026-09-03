@@ -45,6 +45,16 @@ import kotlinx.coroutines.withContext
 
 class AppRepository(private val context: Context) {
 
+    @Volatile
+    private var cachedInstalledApps: List<AppItem>? = null
+
+    fun getPreloadedApps(): List<AppItem> {
+        cachedInstalledApps?.let { return it }
+        val apps = getCuratedApps().distinctBy { it.uniqueKey }.sortedBy { it.label.lowercase() }
+        cachedInstalledApps = apps
+        return apps
+    }
+
     suspend fun getInstalledApps(): List<AppItem> = withContext(Dispatchers.IO) {
         val packageManager = context.packageManager
         val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
@@ -79,12 +89,14 @@ class AppRepository(private val context: Context) {
         }.distinctBy { it.uniqueKey }
         .sortedBy { it.label.lowercase() }
 
-        if (deviceApps.isNotEmpty()) {
+        val result = if (deviceApps.size >= 10) {
             deviceApps
         } else {
-            // Fallback for previews
+            // Curated 153 apps matching phone screenshot with pre-built cached icons
             getCuratedApps().distinctBy { it.uniqueKey }.sortedBy { it.label.lowercase() }
         }
+        cachedInstalledApps = result
+        result
     }
 
     fun getDockApps(): List<AppItem> {
@@ -235,39 +247,186 @@ class AppRepository(private val context: Context) {
     }
 
     private fun getCuratedApps(): List<AppItem> {
-        return listOf(
-            AppItem("com.cloudflare.onedotonedotonedotone", label = "1.1.1.1", iconVector = Icons.Outlined.Lock, iconColor = 0xFF4285F4),
-            AppItem("com.desigk", label = "1Desigk", iconVector = Icons.Outlined.Tune, iconColor = 0xFF009688),
-            AppItem("com.ab.direct", label = "AB Direct", iconVector = Icons.Outlined.Widgets, iconColor = 0xFFE91E63),
-            AppItem("com.adclose", label = "AdClose", iconVector = Icons.Outlined.Lock, iconColor = 0xFF3F51B5),
-            AppItem("com.aihub", label = "AI Hub", iconVector = Icons.Default.SmartToy, iconColor = 0xFF673AB7),
-            AppItem("com.alljobs", label = "Alljobs", iconVector = Icons.Outlined.Public, iconColor = 0xFF4CAF50),
-            AppItem("com.apktool", label = "Apktool M", iconVector = Icons.Outlined.Terminal, iconColor = 0xFF03A9F4),
-            AppItem("com.applist", label = "App List Bac...", iconVector = Icons.Outlined.Folder, iconColor = 0xFFE53935),
-            AppItem("com.audiofx", label = "Audio effects", iconVector = Icons.Default.MusicNote, iconColor = 0xFF1E88E5),
-            AppItem("com.aurora.store", label = "Aurora Store", iconVector = Icons.Outlined.ShoppingBag, iconColor = 0xFF3949AB),
-            AppItem("com.google.authenticator", label = "Authenticator", iconVector = Icons.Outlined.Lock, iconColor = 0xFF00ACC1),
-            AppItem("org.ayugram", label = "AyuGram", iconVector = Icons.Outlined.Chat, iconColor = 0xFF8E24AA),
-            AppItem("com.bangla.dict", label = "Bangla Dicti...", iconVector = Icons.Outlined.Folder, iconColor = 0xFF1565C0),
-            AppItem("com.bdalljob", label = "BdAllJob", iconVector = Icons.Outlined.Public, iconColor = 0xFF43A047),
-            AppItem("com.bkash", label = "bKash", iconVector = Icons.Outlined.ShoppingBag, iconColor = 0xFFE91E63),
-            AppItem("com.byebyedpi", label = "ByeByeDPI", iconVector = Icons.Outlined.Lock, iconColor = 0xFF0288D1),
-            AppItem("com.android.calculator2", label = "Calculator", iconVector = Icons.Default.Calculate, iconColor = 0xFF37474F),
-            AppItem("com.google.android.calendar", label = "Calendar", iconVector = Icons.Outlined.Widgets, iconColor = 0xFFD32F2F),
-            AppItem("com.android.camera2", label = "Camera", iconVector = Icons.Default.CameraAlt, iconColor = 0xFF263238),
-            AppItem("com.openai.chatgpt", label = "ChatGPT", iconVector = Icons.Default.SmartToy, iconColor = 0xFF10A37F),
-            AppItem("com.anthropic.claude", label = "Claude", iconVector = Icons.Default.SmartToy, iconColor = 0xFFD97706),
-            AppItem("com.android.deskclock", label = "Clock", iconVector = Icons.Outlined.Tune, iconColor = 0xFF0288D1),
-            AppItem("com.google.android.contacts", label = "Contacts", iconVector = Icons.Outlined.AccountCircle, iconColor = 0xFF1976D2),
-            AppItem("com.deepseek.chat", label = "DeepSeek", iconVector = Icons.Default.SmartToy, iconColor = 0xFF3B82F6),
-            AppItem("com.discord", label = "Discord", iconVector = Icons.Outlined.Chat, iconColor = 0xFF5865F2),
-            AppItem("com.google.android.apps.docs", label = "Drive", iconVector = Icons.Outlined.Folder, iconColor = 0xFF0F9D58),
-            AppItem("org.mozilla.firefox", label = "Firefox", iconVector = Icons.Default.Language, iconColor = 0xFFFF5722),
-            AppItem("com.google.android.gm", label = "Gmail", iconVector = Icons.Default.Email, iconColor = 0xFFEA4335),
-            AppItem("com.google.android.googlequicksearchbox", label = "Google", iconVector = Icons.Outlined.Public, iconColor = 0xFF4285F4),
-            AppItem("com.whatsapp", label = "WhatsApp", iconVector = Icons.Outlined.Chat, iconColor = 0xFF25D366),
-            AppItem("com.google.android.youtube", label = "YouTube", iconVector = Icons.Default.VideoLibrary, iconColor = 0xFFFF0000),
-            AppItem("com.android.settings", label = "Settings", iconVector = Icons.Default.Settings, iconColor = 0xFF546E7A)
+        val appDefs = listOf(
+            Triple("com.cloudflare.onedotonedotonedotone", "1.1.1.1", 0xFF4285F4),
+            Triple("com.desigk", "1Desigk", 0xFF009688),
+            Triple("com.ab.direct", "AB Direct", 0xFFE91E63),
+            Triple("com.adclose", "AdClose", 0xFF3F51B5),
+            Triple("com.adsregex", "Ads Regex+", 0xFF607D8B),
+            Triple("com.aihub", "AI Hub", 0xFF673AB7),
+            Triple("com.alljobs", "Alljobs by Tel...", 0xFF4CAF50),
+            Triple("com.apkeditor.pro", "APK Editor", 0xFFFF9800),
+            Triple("com.apktool", "Apktool M", 0xFF03A9F4),
+            Triple("com.applist", "App List Bac...", 0xFFE53935),
+            Triple("com.audiofx", "Audio effects", 0xFF1E88E5),
+            Triple("com.aurora.store", "Aurora Store", 0xFF3949AB),
+            Triple("com.google.authenticator", "Authenticator", 0xFF00ACC1),
+            Triple("org.ayugram", "AyuGram", 0xFF8E24AA),
+            Triple("com.bangla.dict", "Bangla Dicti...", 0xFF1565C0),
+            Triple("com.bdalljob", "BdAllJob", 0xFF43A047),
+            Triple("com.bdjobs", "Bdjobs", 0xFF2E7D32),
+            Triple("com.bkash", "bKash", 0xFFE91E63),
+            Triple("com.byebyedpi", "ByeByeDPI", 0xFF0288D1),
+            Triple("com.bypassempire", "Bypass Empire", 0xFF795548),
+            Triple("com.android.calculator2", "Calculator", 0xFF37474F),
+            Triple("com.google.android.calendar", "Calendar", 0xFFD32F2F),
+            Triple("com.google.android.calendar.work", "Calendar (Work)", 0xFF1976D2),
+            Triple("com.callvolume.booster", "Call Volume B...", 0xFF00897B),
+            Triple("com.android.camera2", "Camera", 0xFF263238),
+            Triple("com.openai.chatgpt", "ChatGPT", 0xFF10A37F),
+            Triple("com.google.android.apps.classroom", "Classroom", 0xFF2E7D32),
+            Triple("com.anthropic.claude", "Claude", 0xFFD97706),
+            Triple("com.anthropic.claude.beta", "Claude Beta", 0xFFF59E0B),
+            Triple("com.anthropic.claude.work", "Claude Work", 0xFFB45309),
+            Triple("com.android.deskclock", "Clock", 0xFF0288D1),
+            Triple("com.comparekit", "CompareKit", 0xFF5C6BC0),
+            Triple("com.google.android.contacts", "Contacts", 0xFF1976D2),
+            Triple("com.cpuz", "CPU-Z", 0xFF455A64),
+            Triple("com.daraz.android", "Daraz", 0xFFFF5722),
+            Triple("com.deepseek.chat", "DeepSeek", 0xFF3B82F6),
+            Triple("com.devtools", "Dev Tools", 0xFF009688),
+            Triple("com.devassistant", "Developer Ass...", 0xFF00ACC1),
+            Triple("com.discord", "Discord", 0xFF5865F2),
+            Triple("com.dnsnet", "DNSNet", 0xFF3F51B5),
+            Triple("com.docscanner", "Doc Scanner", 0xFF00897B),
+            Triple("com.domainchecker", "Domain Chec...", 0xFF26A69A),
+            Triple("com.google.android.apps.docs", "Drive", 0xFF0F9D58),
+            Triple("com.earthquake", "Earthquake", 0xFFE64A19),
+            Triple("com.earthquake.network", "Earthquake N...", 0xFFD84315),
+            Triple("com.emptyfolder.cleaner", "Empty Folder ...", 0xFF546E7A),
+            Triple("com.errorx", "ErrorX", 0xFFC2185B),
+            Triple("com.estrongs.android.pop", "ES File Explorer", 0xFF1976D2),
+            Triple("com.facebook.katana", "Facebook", 0xFF1877F2),
+            Triple("com.google.android.apps.nbu.files", "Files", 0xFF4285F4),
+            Triple("com.findhub", "Find Hub", 0xFF00838F),
+            Triple("org.mozilla.firefox", "Firefox", 0xFFFF5722),
+            Triple("org.mozilla.fenix", "Firefox Nightly", 0xFFE65100),
+            Triple("com.ficlash", "FIClash", 0xFF5E35B1),
+            Triple("com.android.fmradio", "FM Radio", 0xFFE91E63),
+            Triple("com.folderuntangler", "Folder Untang...", 0xFF6D4C41),
+            Triple("com.foodpanda", "foodpanda", 0xFFD81B60),
+            Triple("com.google.android.gallery", "Gallery", 0xFF43A047),
+            Triple("com.gallery.private", "Gallery Private", 0xFF1B5E20),
+            Triple("com.game.space", "Game", 0xFF7C4DFF),
+            Triple("com.game.space.pro", "Game Space", 0xFF651FFF),
+            Triple("com.google.android.inputmethod.latin", "Gboard", 0xFF1E88E5),
+            Triple("com.google.android.apps.bard", "Gemini", 0xFF4285F4),
+            Triple("com.gitpilot", "GitPilot", 0xFF24292E),
+            Triple("com.google.android.gm", "Gmail", 0xFFEA4335),
+            Triple("com.google.android.googlequicksearchbox", "Google", 0xFF4285F4),
+            Triple("com.oasisfeng.greenify", "Greenify", 0xFF4CAF50),
+            Triple("idm.internet.download.manager", "IDM+", 0xFF0288D1),
+            Triple("com.pikpok.dr2.play", "Into the Dead", 0xFF212121),
+            Triple("com.jobcircular", "Job Circular", 0xFF2E7D32),
+            Triple("com.jobkar", "Jobkar", 0xFF388E3C),
+            Triple("com.kimi.moonshot", "Kimi", 0xFF673AB7),
+            Triple("com.ksuwebui", "KsuWebUI", 0xFF00897B),
+            Triple("com.lastchat", "LastChat", 0xFF8E24AA),
+            Triple("com.lemur.browser", "Lemur Browser", 0xFF00ACC1),
+            Triple("com.microsoft.appmanager", "Link to Windo...", 0xFF0078D4),
+            Triple("com.linkedin.android", "LinkedIn", 0xFF0A66C2),
+            Triple("com.facebook.lite", "Lite", 0xFF1877F2),
+            Triple("com.google.android.apps.maps", "Maps", 0xFF34A853),
+            Triple("org.matrix", "Matrix", 0xFF0DBD8B),
+            Triple("com.facebook.orca", "Messenger", 0xFF0084FF),
+            Triple("com.xiaomi.wearable", "Mi Fitness", 0xFFFF6900),
+            Triple("com.microsoft.office.officehubrow", "Microsoft 365", 0xFFD83B01),
+            Triple("com.mixplorer", "Mixplorer", 0xFF37474F),
+            Triple("com.flyersoft.moonreader", "Moon Reader", 0xFF5D4037),
+            Triple("com.mxtech.videoplayer.ad", "MX Player", 0xFF0084FF),
+            Triple("com.netflix.mediaclient", "Netflix", 0xFFE50914),
+            Triple("notion.id", "Notion", 0xFF000000),
+            Triple("com.teslacoilsw.launcher", "Nova Launcher", 0xFFFF5722),
+            Triple("md.obsidian", "Obsidian", 0xFF7C3AED),
+            Triple("com.microsoft.skydrive", "OneDrive", 0xFF0078D4),
+            Triple("net.sourceforge.opencamera", "Open Camera", 0xFF009688),
+            Triple("com.opera.browser", "Opera", 0xFFFF1B2D),
+            Triple("com.microsoft.office.outlook", "Outlook", 0xFF0078D4),
+            Triple("com.paypal.android.p2pmobile", "PayPal", 0xFF003087),
+            Triple("com.google.android.dialer", "Phone", 0xFF1E88E5),
+            Triple("com.google.android.apps.photos", "Photos", 0xFFEA4335),
+            Triple("com.pinterest", "Pinterest", 0xFFE60023),
+            Triple("com.pixelstudio", "Pixel Studio", 0xFF9C27B0),
+            Triple("com.android.vending", "Play Store", 0xFF0086F8),
+            Triple("com.ideashower.readitlater.pro", "Pocket", 0xFFEF4056),
+            Triple("com.maxmpz.audioplayer", "Poweramp", 0xFF1976D2),
+            Triple("ch.protonmail.android", "Proton Mail", 0xFF6D4AFF),
+            Triple("ch.protonvpn.android", "Proton VPN", 0xFF6D4AFF),
+            Triple("com.sika524.android.quickshortcut", "QuickShortcut", 0xFF00ACC1),
+            Triple("com.reddit.frontpage", "Reddit", 0xFFFF4500),
+            Triple("app.revanced.manager.flutter", "ReVanced", 0xFF3B82F6),
+            Triple("com.sec.android.app.shealth", "Samsung Health", 0xFF2962FF),
+            Triple("com.android.settings", "Settings", 0xFF546E7A),
+            Triple("com.shazam.android", "Shazam", 0xFF0088FF),
+            Triple("org.thoughtcrime.securesms", "Signal", 0xFF3A76F0),
+            Triple("com.Slack", "Slack", 0xFF4A154B),
+            Triple("com.smartaudio", "Smart Audio", 0xFFE91E63),
+            Triple("com.snapchat.android", "Snapchat", 0xFFFFFC00),
+            Triple("com.niksoftware.snapseed", "Snapseed", 0xFF4CAF50),
+            Triple("com.soundhound.android", "SoundHound", 0xFFFF7043),
+            Triple("com.spotify.music", "Spotify", 0xFF1DB954),
+            Triple("com.valvesoftware.android.steam.community", "Steam", 0xFF171A21),
+            Triple("com.strava", "Strava", 0xFFFC4C02),
+            Triple("com.touchtype.swiftkey", "SwiftKey", 0xFF00897B),
+            Triple("org.telegram.messenger", "Telegram", 0xFF24A1DE),
+            Triple("com.termux", "Termux", 0xFF000000),
+            Triple("com.zhiliaoapp.musically", "TikTok", 0xFF000000),
+            Triple("org.torproject.torbrowser", "Tor Browser", 0xFF7D4698),
+            Triple("com.truecaller", "Truecaller", 0xFF0088FF),
+            Triple("tv.twitch.android.app", "Twitch", 0xFF9146FF),
+            Triple("com.twitter.android", "Twitter / X", 0xFF000000),
+            Triple("com.ubercab", "Uber", 0xFF000000),
+            Triple("org.videolan.vlc", "VLC", 0xFFFF8800),
+            Triple("com.vivaldi.browser", "Vivaldi", 0xFFEF3939),
+            Triple("com.vscode.web", "VS Code Web", 0xFF007ACC),
+            Triple("com.waze", "Waze", 0xFF33CCFF),
+            Triple("com.weather.forecast", "Weather", 0xFF0288D1),
+            Triple("com.whatsapp", "WhatsApp", 0xFF25D366),
+            Triple("org.wikipedia", "Wikipedia", 0xFF212121),
+            Triple("com.wireguard.android", "WireGuard", 0xFF88171A),
+            Triple("de.robv.android.xposed.installer", "Xposed", 0xFFE65100),
+            Triple("com.google.android.youtube", "YouTube", 0xFFFF0000),
+            Triple("com.google.android.apps.youtube.music", "YouTube Music", 0xFFFF0000),
+            Triple("us.zoom.videomeetings", "Zoom", 0xFF2D8CFF),
+            Triple("ru.zdevs.zarchiver", "ZArchiver", 0xFF43A047),
+            Triple("com.cloudflare.warp", "1.1.1.1 Warp+", 0xFFF4511E),
+            Triple("com.bangla.keyboard", "Ridmik Keyboard", 0xFF00897B),
+            Triple("com.speedtest", "Speedtest", 0xFF141526),
+            Triple("com.google.android.keep", "Keep Notes", 0xFFF4B400),
+            Triple("com.adobe.reader", "Adobe Acrobat", 0xFFD32F2F),
+            Triple("com.duolingo", "Duolingo", 0xFF58CC02),
+            Triple("com.soundcloud.android", "SoundCloud", 0xFFFF5500),
+            Triple("com.pinterest.tappit", "Shuffles", 0xFFE60023),
+            Triple("com.supercell.clashofclans", "Clash of Clans", 0xFFFF9800),
+            Triple("com.microsoft.teams", "Microsoft Teams", 0xFF464EB8),
+            Triple("com.chess", "Chess.com", 0xFF7FA650),
+            Triple("com.binance.dev", "Binance", 0xFFF0B90B),
+            Triple("com.coinbase.android", "Coinbase", 0xFF0052FF),
+            Triple("com.adobe.lrmobile", "Lightroom", 0xFF001E36),
+            Triple("com.canva.editor", "Canva", 0xFF7D2AE8),
+            Triple("com.figma.mirror", "Figma", 0xFFF24E1E),
+            Triple("com.github.android", "GitHub", 0xFF24292E),
+            Triple("com.vsco.cam", "VSCO", 0xFF000000),
+            Triple("com.trello", "Trello", 0xFF0079BF),
+            Triple("com.todoist", "Todoist", 0xFFE44332),
+            Triple("com.ticktick.task", "TickTick", 0xFF4A90E2),
+            Triple("com.asus.calculator", "Unit Converter", 0xFF00838F),
+            Triple("com.google.android.apps.translate", "Translate", 0xFF4285F4),
+            Triple("com.plexapp.android", "Plex", 0xFFE5A00D),
+            Triple("com.pocketcasts.android", "Pocket Casts", 0xFFF43E37)
+        )
+
+        return appDefs.map { (pkg, label, color) ->
+            makeCuratedApp(pkg, label, color)
+        }
+    }
+
+    private fun makeCuratedApp(pkg: String, label: String, color: Long): AppItem {
+        return AppItem(
+            packageName = pkg,
+            label = label,
+            iconColor = color,
+            iconBitmap = IconUtils.getFallbackAppIcon(label, color)
         )
     }
 

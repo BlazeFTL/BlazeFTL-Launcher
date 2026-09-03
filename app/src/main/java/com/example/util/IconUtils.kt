@@ -45,5 +45,36 @@ object IconUtils {
         }
         return imageBitmap
     }
+
+    fun getFallbackAppIcon(label: String, colorLong: Long): ImageBitmap {
+        val key = "fallback_${label.take(1).uppercase()}_$colorLong"
+        val cached = iconCache.get(key)
+        if (cached != null) return cached
+
+        val targetSize = 144
+        val bmp = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = colorLong.toInt()
+            style = android.graphics.Paint.Style.FILL
+        }
+        canvas.drawCircle(targetSize / 2f, targetSize / 2f, targetSize / 2f, paint)
+
+        val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            textSize = targetSize * 0.44f
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+        val charStr = label.take(1).uppercase()
+        val bounds = android.graphics.Rect()
+        textPaint.getTextBounds(charStr, 0, charStr.length, bounds)
+        val yPos = (targetSize / 2f) + (bounds.height() / 2f)
+        canvas.drawText(charStr, targetSize / 2f, yPos, textPaint)
+
+        val imgBitmap = bmp.asImageBitmap()
+        iconCache.put(key, imgBitmap)
+        return imgBitmap
+    }
 }
 

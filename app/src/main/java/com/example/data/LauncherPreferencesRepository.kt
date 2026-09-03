@@ -57,7 +57,7 @@ class LauncherPreferencesRepository(context: Context) {
             appSearchBar = prefs.getBoolean("appSearchBar", true),
             iconLabelsInDrawer = prefs.getBoolean("iconLabelsInDrawer", true),
             drawerRowHeight = prefs.getInt("drawerRowHeight", 75),
-            drawerBackgroundOpacity = prefs.getInt("drawerBackgroundOpacity", 80),
+            drawerBackgroundOpacity = prefs.getInt("drawerBackgroundOpacity", 30),
 
             shakeGestureAction = prefs.getInt("shakeGestureAction", 0),
             shakeGestureIntensity = prefs.getInt("shakeGestureIntensity", 4),

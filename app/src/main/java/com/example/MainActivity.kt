@@ -120,7 +120,7 @@ fun SparkLauncherApp(
     val context = LocalContext.current
     val settings by prefsRepo.settings.collectAsState()
     var currentScreen by remember { mutableStateOf(LauncherScreen.HOME) }
-    var installedApps by remember { mutableStateOf<List<AppItem>>(emptyList()) }
+    var installedApps by remember { mutableStateOf(appRepo.getPreloadedApps()) }
     val dockApps = remember(installedApps) { appRepo.getDockApps() }
     
     val homeAppsList = remember { mutableStateListOf<AppItem>() }
@@ -291,10 +291,11 @@ fun SparkLauncherApp(
     val isDrawerOpen = currentScreen == LauncherScreen.APP_DRAWER
     val drawerProgress by animateFloatAsState(
         targetValue = if (isDrawerOpen) 1f else 0f,
-        animationSpec = spring(
-            dampingRatio = 0.82f,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        animationSpec = if (isDrawerOpen) {
+            tween(durationMillis = 240, easing = FastOutSlowInEasing)
+        } else {
+            tween(durationMillis = 200, easing = FastOutLinearInEasing)
+        },
         label = "DrawerAnimation"
     )
 

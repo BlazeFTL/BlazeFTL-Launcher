@@ -1,22 +1,29 @@
 package com.example.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -25,6 +32,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -44,16 +52,24 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -69,6 +85,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.model.AppItem
 import com.example.model.LauncherSettings
 import com.example.ui.components.AppIconBadge
+import kotlinx.coroutines.launch
 
 @Composable
 fun AppDrawerScreen(
@@ -85,6 +102,7 @@ fun AppDrawerScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedAppForPopup by remember { mutableStateOf<AppItem?>(null) }
     val focusManager = LocalFocusManager.current
+    val coroutineScope = rememberCoroutineScope()
 
     val filteredApps = remember(searchQuery, allApps) {
         if (searchQuery.isBlank()) {
@@ -97,37 +115,49 @@ fun AppDrawerScreen(
         }
     }
 
-    val overlayAlpha = (settings.drawerBackgroundOpacity / 100f).coerceIn(0.2f, 0.95f)
+    // Background Opacity makes background light (White scrim) over wallpaper
+    // Default 30% creates a modern translucent frosted light scrim
+    val overlayAlpha = (settings.drawerBackgroundOpacity / 100f).coerceIn(0f, 1f)
+    val isLightBackground = settings.drawerBackgroundOpacity >= 45
+    val labelColor = if (isLightBackground) Color(0xFF1E293B) else Color.White
+    val headerTextColor = if (isLightBackground) Color(0xFF475569) else Color.White.copy(alpha = 0.75f)
+    val handleColor = if (isLightBackground) Color(0xFF94A3B8) else Color.White.copy(alpha = 0.65f)
+
     val gridState = rememberLazyGridState()
     val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-    var dragOffsetY by remember { mutableStateOf(0f) }
+    // Nested scroll connection for seamless pull down to close when at top
+    val pullDownConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                // If at top of grid and user pulls down with positive Y velocity
+                if (gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0 && available.y > 16f) {
+                    onCloseDrawer()
+                    return Offset(0f, available.y)
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (available.y > 16f && gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0) {
+                    onCloseDrawer()
+                    return Offset(0f, available.y)
+                }
+                return Offset.Zero
+            }
+        }
+    }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onVerticalDrag = { _, dragAmount ->
-                        if (dragAmount > 0) {
-                            dragOffsetY += dragAmount
-                            if (dragOffsetY > 45f && gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0) {
-                                dragOffsetY = 0f
-                                onCloseDrawer()
-                            }
-                        } else {
-                            dragOffsetY = 0f
-                        }
-                    },
-                    onDragEnd = { dragOffsetY = 0f }
-                )
-            }
+            .nestedScroll(pullDownConnection)
     ) {
-        // Translucent overlay over the system wallpaper (SS 1)
+        // Translucent light overlay over the system wallpaper (White scrim)
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = overlayAlpha))
+                .background(Color.White.copy(alpha = overlayAlpha))
         )
 
         Column(
@@ -135,19 +165,26 @@ fun AppDrawerScreen(
                 .fillMaxSize()
                 .statusBarsPadding()
         ) {
-            // Drag Down Close Handle
+            // Drag Down Close Handle & Header Touch Area
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 8.dp, bottom = 4.dp)
                     .clickable { onCloseDrawer() }
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures { _, dragAmount ->
+                            if (dragAmount > 12f) {
+                                onCloseDrawer()
+                            }
+                        }
+                    }
             ) {
                 Box(
                     modifier = Modifier
                         .size(width = 44.dp, height = 5.dp)
                         .clip(RoundedCornerShape(3.dp))
-                        .background(Color.White.copy(alpha = 0.55f))
+                        .background(handleColor)
                 )
             }
 
@@ -227,74 +264,103 @@ fun AppDrawerScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // App Count / Status info Header
+            // App Count / Status info Header (e.g. 153 apps   A - Z)
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 2.dp)
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures { _, dragAmount ->
+                            if (dragAmount > 12f) {
+                                onCloseDrawer()
+                            }
+                        }
+                    }
             ) {
                 Text(
                     text = "${filteredApps.size} apps",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color.White.copy(alpha = 0.65f)
+                    color = headerTextColor
                 )
 
                 Text(
                     text = "A - Z",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White.copy(alpha = 0.65f)
+                    color = headerTextColor
                 )
             }
 
-            // Grid of all apps (6 columns, scrolls seamlessly behind navigation keys like SS 1)
-            val iconScale = (settings.iconSizePercent / 100f).coerceIn(0.6f, 1.4f)
+            // Calculations for Dynamic Sizing & Settings
+            val iconScale = (settings.iconSizePercent / 100f).coerceIn(0.5f, 1.5f)
             val iconBaseDp = (48 * iconScale).dp
-            val rowHeightMultiplier = (settings.drawerRowHeight / 75f).coerceIn(0.6f, 1.3f)
-            val verticalSpacing = (14 * rowHeightMultiplier).dp
+            // Row height directly scales cell height: 50 -> 57.5dp, 75 -> 86dp, 100 -> 115dp
+            val rowHeightDp = (settings.drawerRowHeight * 1.15f).dp
+            val verticalSpacing = ((settings.drawerRowHeight - 35) * 0.45f).coerceAtLeast(4f).dp
             val fontSizeSp = (11.5f * (settings.fontSizePercent / 100f)).sp
-            val bottomPadding = navBarBottomPadding + 20.dp
+            val bottomPadding = navBarBottomPadding + 24.dp
 
-            LazyVerticalGrid(
-                state = gridState,
-                columns = GridCells.Fixed(6),
-                contentPadding = PaddingValues(
-                    start = 4.dp,
-                    end = 4.dp,
-                    top = 8.dp,
-                    bottom = bottomPadding
-                ),
-                verticalArrangement = Arrangement.spacedBy(verticalSpacing),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 4.dp)
-            ) {
-                items(
-                    items = filteredApps,
-                    key = { it.uniqueKey },
-                    contentType = { "drawer_app" }
-                ) { app ->
-                    DrawerAppItemView(
-                        app = app,
-                        iconSizeDp = iconBaseDp,
-                        fontSizeSp = fontSizeSp,
-                        showLabel = settings.iconLabelsInDrawer,
-                        maxLines = settings.maxLabelLines,
-                        forceMonochrome = settings.forceMonochrome && settings.themedIconsInDrawer,
-                        onClick = { onAppClick(app) },
-                        onLongClick = { selectedAppForPopup = app }
-                    )
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                // Grid of all apps (6 columns, scrolls seamlessly behind navigation keys)
+                LazyVerticalGrid(
+                    state = gridState,
+                    columns = GridCells.Fixed(6),
+                    contentPadding = PaddingValues(
+                        start = 4.dp,
+                        end = 12.dp, // Leave breathing room for scrollbar
+                        top = 6.dp,
+                        bottom = bottomPadding
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(verticalSpacing),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(
+                        items = filteredApps,
+                        key = { it.uniqueKey },
+                        contentType = { "drawer_app" }
+                    ) { app ->
+                        DrawerAppItemView(
+                            app = app,
+                            rowHeightDp = rowHeightDp,
+                            iconSizeDp = iconBaseDp,
+                            fontSizeSp = fontSizeSp,
+                            showLabel = settings.iconLabelsInDrawer,
+                            maxLines = settings.maxLabelLines,
+                            labelColor = labelColor,
+                            forceMonochrome = settings.forceMonochrome && settings.themedIconsInDrawer,
+                            showNotificationDot = settings.notificationDots,
+                            onClick = { onAppClick(app) },
+                            onLongClick = { selectedAppForPopup = app }
+                        )
+                    }
                 }
+
+                // Smooth Fast-Scroll Scrollbar on right edge
+                DrawerScrollBar(
+                    totalItems = filteredApps.size,
+                    firstVisibleIndex = gridState.firstVisibleItemIndex,
+                    isLightBackground = isLightBackground,
+                    currentLetter = filteredApps.getOrNull(gridState.firstVisibleItemIndex)?.label?.take(1)?.uppercase() ?: "A",
+                    onScrub = { targetIndex ->
+                        coroutineScope.launch {
+                            gridState.scrollToItem(targetIndex)
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .padding(end = 2.dp, bottom = bottomPadding)
+                )
             }
         }
 
-        // App Item Long Press Popup
+        // App Item Long Press Popup Menu
         if (selectedAppForPopup != null) {
             val app = selectedAppForPopup!!
             Dialog(onDismissRequest = { selectedAppForPopup = null }) {
@@ -305,7 +371,7 @@ fun AppDrawerScreen(
                 ) {
                     Column(modifier = Modifier.padding(18.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            AppIconBadge(app = app, sizeDp = 40.dp)
+                            AppIconBadge(app = app, sizeDp = 42.dp)
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
                                 text = app.label,
@@ -391,34 +457,45 @@ fun AppDrawerScreen(
 @Composable
 fun DrawerAppItemView(
     app: AppItem,
+    rowHeightDp: Dp,
     iconSizeDp: Dp,
     fontSizeSp: TextUnit,
     showLabel: Boolean,
     maxLines: Int,
+    labelColor: Color,
     forceMonochrome: Boolean,
+    showNotificationDot: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
         modifier = modifier
+            .height(rowHeightDp)
+            .fillMaxWidth()
             .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null, // Eliminates heavy ripple allocation during fast scrolling
                 onClick = onClick,
                 onLongClick = onLongClick
             )
-            .padding(vertical = 2.dp)
+            .padding(horizontal = 2.dp, vertical = 2.dp)
     ) {
         AppIconBadge(
             app = app,
             sizeDp = iconSizeDp,
-            forceMonochrome = forceMonochrome
+            forceMonochrome = forceMonochrome,
+            showNotificationDot = showNotificationDot
         )
         if (showLabel) {
             Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = app.label,
-                color = Color.White,
+                color = labelColor,
                 fontSize = fontSizeSp,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center,
@@ -427,6 +504,108 @@ fun DrawerAppItemView(
                 lineHeight = 13.sp,
                 modifier = Modifier.padding(horizontal = 2.dp)
             )
+        }
+    }
+}
+
+@Composable
+fun DrawerScrollBar(
+    totalItems: Int,
+    firstVisibleIndex: Int,
+    isLightBackground: Boolean,
+    currentLetter: String,
+    onScrub: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (totalItems <= 12) return
+
+    var isDragging by remember { mutableStateOf(false) }
+    var dragProgress by remember { mutableFloatStateOf(0f) }
+
+    val scrollFraction by remember(firstVisibleIndex, totalItems) {
+        derivedStateOf {
+            if (totalItems > 1) {
+                (firstVisibleIndex.toFloat() / (totalItems - 1).toFloat()).coerceIn(0f, 1f)
+            } else 0f
+        }
+    }
+
+    val activeFraction = if (isDragging) dragProgress else scrollFraction
+    val trackColor = if (isLightBackground) Color(0x20000000) else Color(0x30FFFFFF)
+    val thumbColor = if (isLightBackground) Color(0xFF64748B) else Color.White.copy(alpha = 0.85f)
+
+    BoxWithConstraints(
+        modifier = modifier
+            .width(28.dp)
+            .pointerInput(totalItems) {
+                detectVerticalDragGestures(
+                    onDragStart = { offset ->
+                        isDragging = true
+                        val fraction = (offset.y / size.height).coerceIn(0f, 1f)
+                        dragProgress = fraction
+                        val target = (fraction * (totalItems - 1)).toInt().coerceIn(0, totalItems - 1)
+                        onScrub(target)
+                    },
+                    onVerticalDrag = { change, _ ->
+                        val fraction = (change.position.y / size.height).coerceIn(0f, 1f)
+                        dragProgress = fraction
+                        val target = (fraction * (totalItems - 1)).toInt().coerceIn(0, totalItems - 1)
+                        onScrub(target)
+                    },
+                    onDragEnd = { isDragging = false },
+                    onDragCancel = { isDragging = false }
+                )
+            }
+    ) {
+        val totalHeight = maxHeight
+        val thumbHeight = 42.dp
+        val availableTravel = totalHeight - thumbHeight
+        val thumbOffset = availableTravel * activeFraction
+
+        // Vertical Track line
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .width(3.dp)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(2.dp))
+                .background(trackColor)
+        )
+
+        // Draggable Thumb Indicator
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = thumbOffset)
+                .width(4.dp)
+                .height(thumbHeight)
+                .clip(RoundedCornerShape(3.dp))
+                .background(thumbColor)
+        )
+
+        // Alphabet Indicator Bubble while dragging
+        AnimatedVisibility(
+            visible = isDragging,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = (-34).dp, y = (thumbOffset - 8.dp).coerceAtLeast(0.dp))
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE85D54))
+            ) {
+                Text(
+                    text = currentLetter,
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }

@@ -218,8 +218,15 @@ fun HomeScreen(
                             showLabel = settings.iconLabelsOnDesktop,
                             maxLines = settings.maxLabelLines,
                             forceMonochrome = settings.forceMonochrome && settings.themedIcons,
+                            showNotificationDot = settings.notificationDots,
                             onClick = { onAppClick(app) },
-                            onLongClick = { selectedAppForPopup = app }
+                            onLongClick = {
+                                if (settings.lockLayout) {
+                                    onShowToast("Desktop layout is locked in settings")
+                                } else {
+                                    selectedAppForPopup = app
+                                }
+                            }
                         )
                     }
                 }
@@ -438,7 +445,11 @@ fun QuickspaceWidget(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (settings.detailedWeather) "24°C Sunny" else "24°C",
+                            text = if (settings.detailedWeather) {
+                                if (settings.currentCity) "24°C Sunny, New York" else "24°C Sunny"
+                            } else {
+                                if (settings.currentCity) "24°C, New York" else "24°C"
+                            },
                             color = Color.White.copy(alpha = 0.95f),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Normal,
@@ -481,6 +492,7 @@ fun DesktopAppIcon(
     showLabel: Boolean,
     maxLines: Int,
     forceMonochrome: Boolean,
+    showNotificationDot: Boolean = false,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -502,7 +514,8 @@ fun DesktopAppIcon(
         AppIconBadge(
             app = app,
             sizeDp = iconSizeDp,
-            forceMonochrome = forceMonochrome
+            forceMonochrome = forceMonochrome,
+            showNotificationDot = showNotificationDot
         )
         if (showLabel) {
             Spacer(modifier = Modifier.height(4.dp))
@@ -556,6 +569,7 @@ fun HotseatDock(
                     showLabel = false,
                     maxLines = 1,
                     forceMonochrome = forceMonochrome,
+                    showNotificationDot = settings.notificationDots,
                     onClick = { onAppClick(app) },
                     onLongClick = { onAppClick(app) },
                     modifier = Modifier.weight(1f)
