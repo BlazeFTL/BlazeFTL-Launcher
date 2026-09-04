@@ -79,6 +79,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -126,24 +127,51 @@ fun AppDrawerScreen(
     val gridState = rememberLazyGridState()
     val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-    // Nested scroll connection for seamless pull down to close when at top
+    var accumulatedPullDown by remember { mutableFloatStateOf(0f) }
+
+    // Nested scroll connection for seamless, reliable 1-pull down to close when at top
     val pullDownConnection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // If at top of grid and user pulls down with positive Y velocity
-                if (gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0 && available.y > 16f) {
-                    onCloseDrawer()
-                    return Offset(0f, available.y)
+                // Check if user is at or near top of the grid (even after scrolling down and back up)
+                val isAtTop = !gridState.canScrollBackward || 
+                    (gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset <= 24)
+
+                // If at top and pulling downward
+                if (isAtTop && available.y > 0f) {
+                    accumulatedPullDown += available.y
+                    if (accumulatedPullDown > 18f) {
+                        accumulatedPullDown = 0f
+                        onCloseDrawer()
+                        return Offset(0f, available.y)
+                    }
+                } else if (available.y < -5f) {
+                    accumulatedPullDown = 0f
                 }
                 return Offset.Zero
             }
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                if (available.y > 16f && gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0) {
-                    onCloseDrawer()
-                    return Offset(0f, available.y)
+                // Catch any overscroll pull down at top
+                if (available.y > 0f) {
+                    accumulatedPullDown += available.y
+                    if (accumulatedPullDown > 14f) {
+                        accumulatedPullDown = 0f
+                        onCloseDrawer()
+                        return Offset(0f, available.y)
+                    }
                 }
                 return Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                accumulatedPullDown = 0f
+                // Fling downwards at top
+                if (available.y > 50f || (!gridState.canScrollBackward && consumed.y > 120f)) {
+                    onCloseDrawer()
+                    return Velocity(0f, available.y)
+                }
+                return Velocity.Zero
             }
         }
     }
@@ -153,13 +181,6 @@ fun AppDrawerScreen(
             .fillMaxSize()
             .nestedScroll(pullDownConnection)
     ) {
-        // Translucent light overlay over the system wallpaper (White scrim)
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.White.copy(alpha = overlayAlpha))
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -174,7 +195,7 @@ fun AppDrawerScreen(
                     .clickable { onCloseDrawer() }
                     .pointerInput(Unit) {
                         detectVerticalDragGestures { _, dragAmount ->
-                            if (dragAmount > 12f) {
+                            if (dragAmount > 8f) {
                                 onCloseDrawer()
                             }
                         }
@@ -275,7 +296,7 @@ fun AppDrawerScreen(
                     .padding(horizontal = 20.dp, vertical = 2.dp)
                     .pointerInput(Unit) {
                         detectVerticalDragGestures { _, dragAmount ->
-                            if (dragAmount > 12f) {
+                            if (dragAmount > 8f) {
                                 onCloseDrawer()
                             }
                         }

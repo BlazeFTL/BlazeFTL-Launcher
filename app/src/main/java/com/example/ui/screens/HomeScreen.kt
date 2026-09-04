@@ -127,7 +127,7 @@ fun HomeScreen(
             .draggable(
                 state = rememberDraggableState { delta ->
                     totalDragY += delta
-                    if (totalDragY < -30f) {
+                    if (totalDragY < -24f) {
                         totalDragY = 0f
                         onOpenDrawer()
                     } else if (totalDragY > 50f) {

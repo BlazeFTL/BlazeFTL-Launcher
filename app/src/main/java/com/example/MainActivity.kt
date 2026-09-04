@@ -18,6 +18,7 @@ import androidx.core.view.WindowCompat
 import android.graphics.Color as AndroidColor
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -30,6 +31,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -292,9 +295,9 @@ fun SparkLauncherApp(
     val drawerProgress by animateFloatAsState(
         targetValue = if (isDrawerOpen) 1f else 0f,
         animationSpec = if (isDrawerOpen) {
-            tween(durationMillis = 240, easing = FastOutSlowInEasing)
+            tween(durationMillis = 360, easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f))
         } else {
-            tween(durationMillis = 200, easing = FastOutLinearInEasing)
+            tween(durationMillis = 280, easing = CubicBezierEasing(0.3f, 0.0f, 0.8f, 0.15f))
         },
         label = "DrawerAnimation"
     )
@@ -304,7 +307,7 @@ fun SparkLauncherApp(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Base Home Screen (always mounted, fades cleanly as drawer slides in)
+        // Base Home Screen (always mounted, fades cleanly with subtle parallax shift as drawer slides in)
         HomeScreen(
             settings = settings,
             homeApps = homeAppsList,
@@ -326,13 +329,24 @@ fun SparkLauncherApp(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    alpha = (1f - drawerProgress * 2f).coerceIn(0f, 1f)
-                    scaleX = 1f - (drawerProgress * 0.05f)
-                    scaleY = 1f - (drawerProgress * 0.05f)
+                    alpha = (1f - drawerProgress * 1.5f).coerceIn(0f, 1f)
+                    translationY = -drawerProgress * 100f
+                    scaleX = 1f - (drawerProgress * 0.04f)
+                    scaleY = 1f - (drawerProgress * 0.04f)
                 }
         )
 
-        // App Drawer Sliding Overlay (Hardware accelerated with zero jank/delay)
+        // Fullscreen Translucent Light Scrim over system wallpaper (matches Reference Screenshots 2 & 4)
+        val overlayAlpha = (settings.drawerBackgroundOpacity / 100f).coerceIn(0f, 1f)
+        if (drawerProgress > 0.001f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.White.copy(alpha = overlayAlpha * drawerProgress))
+            )
+        }
+
+        // App Drawer Sliding Overlay (Smoothly appears and glides up from bottom)
         if (drawerProgress > 0.001f || isDrawerOpen) {
             AppDrawerScreen(
                 settings = settings,
@@ -347,7 +361,7 @@ fun SparkLauncherApp(
                     .fillMaxSize()
                     .graphicsLayer {
                         translationY = (1f - drawerProgress) * size.height
-                        alpha = drawerProgress.coerceIn(0f, 1f)
+                        alpha = (drawerProgress * 1.8f).coerceIn(0f, 1f)
                     }
             )
         }
