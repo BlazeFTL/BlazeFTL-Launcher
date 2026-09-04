@@ -1,7 +1,9 @@
 package com.example
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -15,6 +17,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.lifecycleScope
 import android.graphics.Color as AndroidColor
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -76,6 +79,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var prefsRepo: LauncherPreferencesRepository
     private lateinit var appRepo: AppRepository
+    private var packageReceiver: BroadcastReceiver? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -96,6 +100,23 @@ class MainActivity : ComponentActivity() {
         prefsRepo = LauncherPreferencesRepository(applicationContext)
         appRepo = AppRepository(applicationContext)
 
+        // As soon as launcher is launched, build installed app data immediately in background
+        appRepo.buildInstalledAppDataAsync(lifecycleScope)
+
+        val packageFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_CHANGED)
+            addDataScheme("package")
+        }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                appRepo.buildInstalledAppDataAsync(lifecycleScope)
+            }
+        }
+        packageReceiver = receiver
+        registerReceiver(receiver, packageFilter)
+
         setContent {
             MyApplicationTheme {
                 SparkLauncherApp(
@@ -112,6 +133,13 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        packageReceiver?.let {
+            try { unregisterReceiver(it) } catch (e: Exception) { }
+        }
+    }
 }
 
 @Composable
@@ -123,6 +151,7 @@ fun SparkLauncherApp(
     val context = LocalContext.current
     val settings by prefsRepo.settings.collectAsState()
     var currentScreen by remember { mutableStateOf(LauncherScreen.HOME) }
+    val repoInstalledApps by appRepo.installedAppsFlow.collectAsState()
     var installedApps by remember { mutableStateOf(appRepo.getPreloadedApps()) }
     val dockApps = remember(installedApps) { appRepo.getDockApps() }
     
@@ -151,27 +180,26 @@ fun SparkLauncherApp(
         }
     }
 
-    // Refresh installed apps and sync home screen items
-    LaunchedEffect(Unit) {
-        val loaded = appRepo.getInstalledApps()
-        installedApps = loaded
-
-        val savedPackages = prefsRepo.getHomeScreenPackages()
-        if (savedPackages != null && savedPackages.isNotEmpty()) {
-            val appMap = loaded.associateBy { it.packageName }
-            val restored = savedPackages.mapNotNull { appMap[it] }
-            homeAppsList.clear()
-            if (restored.isNotEmpty()) {
-                homeAppsList.addAll(restored)
-            } else {
+    // Refresh installed apps and sync home screen items as soon as data is ready
+    LaunchedEffect(repoInstalledApps) {
+        if (repoInstalledApps.isNotEmpty()) {
+            installedApps = repoInstalledApps
+            val savedPackages = prefsRepo.getHomeScreenPackages()
+            if (savedPackages != null && savedPackages.isNotEmpty()) {
+                val appMap = repoInstalledApps.associateBy { it.packageName }
+                val restored = savedPackages.mapNotNull { appMap[it] }
+                homeAppsList.clear()
+                if (restored.isNotEmpty()) {
+                    homeAppsList.addAll(restored)
+                } else {
+                    homeAppsList.addAll(appRepo.getHomeScreenApps())
+                }
+            } else if (homeAppsList.isEmpty()) {
+                homeAppsList.clear()
                 homeAppsList.addAll(appRepo.getHomeScreenApps())
             }
-        } else {
-            homeAppsList.clear()
-            homeAppsList.addAll(appRepo.getHomeScreenApps())
+            memoryInfoText = appRepo.getFormattedMemoryInfo()
         }
-
-        memoryInfoText = appRepo.getFormattedMemoryInfo()
     }
 
     var isAudioPlaying by remember { mutableStateOf(false) }
@@ -295,7 +323,7 @@ fun SparkLauncherApp(
     val drawerProgress by animateFloatAsState(
         targetValue = if (isDrawerOpen) 1f else 0f,
         animationSpec = if (isDrawerOpen) {
-            tween(durationMillis = 360, easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f))
+            tween(durationMillis = 390, easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1.0f))
         } else {
             tween(durationMillis = 280, easing = CubicBezierEasing(0.3f, 0.0f, 0.8f, 0.15f))
         },
@@ -346,8 +374,15 @@ fun SparkLauncherApp(
             )
         }
 
-        // App Drawer Sliding Overlay (Smoothly appears and glides up from bottom)
-        if (drawerProgress > 0.001f || isDrawerOpen) {
+        // App Drawer Sliding Overlay (Pre-composed off-screen so drawer glides up with 0 frame drops)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    translationY = (1f - drawerProgress) * size.height
+                    alpha = if (drawerProgress <= 0.001f) 0f else (drawerProgress * 1.5f).coerceIn(0f, 1f)
+                }
+        ) {
             AppDrawerScreen(
                 settings = settings,
                 allApps = visibleDrawerApps,
@@ -357,12 +392,7 @@ fun SparkLauncherApp(
                 onUninstallApp = { appRepo.uninstallApp(it) },
                 onCloseDrawer = { currentScreen = LauncherScreen.HOME },
                 onShowToast = { showToast(it) },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        translationY = (1f - drawerProgress) * size.height
-                        alpha = (drawerProgress * 1.8f).coerceIn(0f, 1f)
-                    }
+                modifier = Modifier.fillMaxSize()
             )
         }
 

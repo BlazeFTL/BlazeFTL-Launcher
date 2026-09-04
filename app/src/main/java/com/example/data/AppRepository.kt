@@ -40,13 +40,32 @@ import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.Widgets
 import com.example.model.AppItem
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class AppRepository(private val context: Context) {
 
     @Volatile
     private var cachedInstalledApps: List<AppItem>? = null
+
+    private val _installedAppsFlow = MutableStateFlow<List<AppItem>>(emptyList())
+    val installedAppsFlow: StateFlow<List<AppItem>> = _installedAppsFlow.asStateFlow()
+
+    init {
+        _installedAppsFlow.value = getPreloadedApps()
+    }
+
+    fun buildInstalledAppDataAsync(scope: CoroutineScope) {
+        scope.launch(Dispatchers.IO) {
+            val loaded = getInstalledApps()
+            _installedAppsFlow.value = loaded
+        }
+    }
 
     fun getPreloadedApps(): List<AppItem> {
         cachedInstalledApps?.let { return it }
@@ -89,13 +108,14 @@ class AppRepository(private val context: Context) {
         }.distinctBy { it.uniqueKey }
         .sortedBy { it.label.lowercase() }
 
-        val result = if (deviceApps.size >= 10) {
+        val result = if (deviceApps.isNotEmpty()) {
             deviceApps
         } else {
             // Curated 153 apps matching phone screenshot with pre-built cached icons
             getCuratedApps().distinctBy { it.uniqueKey }.sortedBy { it.label.lowercase() }
         }
         cachedInstalledApps = result
+        _installedAppsFlow.value = result
         result
     }
 

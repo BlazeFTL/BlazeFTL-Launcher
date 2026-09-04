@@ -7,6 +7,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -127,21 +129,19 @@ fun AppDrawerScreen(
     val gridState = rememberLazyGridState()
     val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
+    var isGestureStartedAtTop by remember { mutableStateOf(false) }
     var accumulatedPullDown by remember { mutableFloatStateOf(0f) }
 
-    // Nested scroll connection for seamless, reliable 1-pull down to close when at top
+    // Nested scroll connection: Only close with pull down if the gesture started while ALREADY at the top
     val pullDownConnection = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // Check if user is at or near top of the grid (even after scrolling down and back up)
-                val isAtTop = !gridState.canScrollBackward || 
-                    (gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset <= 24)
-
-                // If at top and pulling downward
-                if (isAtTop && available.y > 0f) {
+                // If the gesture started while already at top, and user is pulling down
+                if (isGestureStartedAtTop && available.y > 0f) {
                     accumulatedPullDown += available.y
-                    if (accumulatedPullDown > 18f) {
+                    if (accumulatedPullDown > 22f) {
                         accumulatedPullDown = 0f
+                        isGestureStartedAtTop = false
                         onCloseDrawer()
                         return Offset(0f, available.y)
                     }
@@ -152,11 +152,12 @@ fun AppDrawerScreen(
             }
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                // Catch any overscroll pull down at top
-                if (available.y > 0f) {
+                // Only close if gesture started at top. If user was scrolling up from below, it stops at top and NEVER closes.
+                if (isGestureStartedAtTop && available.y > 0f) {
                     accumulatedPullDown += available.y
-                    if (accumulatedPullDown > 14f) {
+                    if (accumulatedPullDown > 18f) {
                         accumulatedPullDown = 0f
+                        isGestureStartedAtTop = false
                         onCloseDrawer()
                         return Offset(0f, available.y)
                     }
@@ -166,11 +167,12 @@ fun AppDrawerScreen(
 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
                 accumulatedPullDown = 0f
-                // Fling downwards at top
-                if (available.y > 50f || (!gridState.canScrollBackward && consumed.y > 120f)) {
+                if (isGestureStartedAtTop && available.y > 60f) {
+                    isGestureStartedAtTop = false
                     onCloseDrawer()
                     return Velocity(0f, available.y)
                 }
+                isGestureStartedAtTop = false
                 return Velocity.Zero
             }
         }
@@ -179,6 +181,24 @@ fun AppDrawerScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    // At the exact moment finger touches down: was the grid already resting at top?
+                    val atTop = !gridState.canScrollBackward && 
+                        gridState.firstVisibleItemIndex == 0 && 
+                        gridState.firstVisibleItemScrollOffset == 0
+                    isGestureStartedAtTop = atTop
+                    accumulatedPullDown = 0f
+
+                    do {
+                        val event = awaitPointerEvent()
+                    } while (event.changes.any { it.pressed })
+
+                    isGestureStartedAtTop = false
+                    accumulatedPullDown = 0f
+                }
+            }
             .nestedScroll(pullDownConnection)
     ) {
         Column(
