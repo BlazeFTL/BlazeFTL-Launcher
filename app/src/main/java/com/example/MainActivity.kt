@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -54,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import com.example.data.AppRepository
 import com.example.data.LauncherPreferencesRepository
@@ -330,6 +332,17 @@ fun SparkLauncherApp(
         label = "DrawerAnimation"
     )
 
+    val view = LocalView.current
+    val isLightDrawerScrim = drawerProgress > 0.5f && settings.drawerBackgroundOpacity >= 40
+    SideEffect {
+        val window = (view.context as? ComponentActivity)?.window
+        if (window != null) {
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = isLightDrawerScrim
+            insetsController.isAppearanceLightNavigationBars = isLightDrawerScrim
+        }
+    }
+
     BackHandler(enabled = isDrawerOpen) {
         currentScreen = LauncherScreen.HOME
     }
@@ -364,13 +377,13 @@ fun SparkLauncherApp(
                 }
         )
 
-        // Fullscreen Translucent Light Scrim over system wallpaper (matches Reference Screenshots 2 & 4)
+        // Fullscreen Translucent Scrim over system wallpaper (matches Reference Screenshots)
         val overlayAlpha = (settings.drawerBackgroundOpacity / 100f).coerceIn(0f, 1f)
         if (drawerProgress > 0.001f) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.White.copy(alpha = overlayAlpha * drawerProgress))
+                    .background(Color(0xFFE2E7EC).copy(alpha = overlayAlpha * drawerProgress))
             )
         }
 

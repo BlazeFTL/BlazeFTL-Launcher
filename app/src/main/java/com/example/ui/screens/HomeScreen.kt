@@ -45,6 +45,8 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ViewCarousel
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material.icons.filled.Widgets
+import androidx.compose.ui.graphics.Shape
+import com.example.util.IconShapeHelper
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -111,6 +113,7 @@ fun HomeScreen(
     var showDesktopMenu by remember { mutableStateOf(false) }
     var selectedAppForPopup by remember { mutableStateOf<AppItem?>(null) }
     var currentSongIndex by remember { mutableIntStateOf(0) }
+    val iconShape = remember(settings.iconShape) { IconShapeHelper.getShape(settings.iconShape) }
 
     val songList = listOf(
         "Базовый минимум (Slow Version)" to "Sabi - Topic",
@@ -196,9 +199,10 @@ fun HomeScreen(
             Spacer(modifier = Modifier.weight(1f))
 
             // Desktop App Grid (Responsive 6 columns)
-            val iconScale = (settings.iconSizePercent / 100f).coerceIn(0.6f, 1.4f)
+            val iconScale = (settings.iconSizePercent / 100f).coerceIn(0.5f, 1.5f)
             val iconBaseDp = (48 * iconScale).dp
             val fontSizeSp = (11.5f * (settings.fontSizePercent / 100f)).sp
+            val iconShape = remember(settings.iconShape) { IconShapeHelper.getShape(settings.iconShape) }
 
             if (homeApps.isNotEmpty()) {
                 LazyVerticalGrid(
@@ -217,6 +221,7 @@ fun HomeScreen(
                             fontSizeSp = fontSizeSp,
                             showLabel = settings.iconLabelsOnDesktop,
                             maxLines = settings.maxLabelLines,
+                            iconShape = iconShape,
                             forceMonochrome = settings.forceMonochrome && settings.themedIcons,
                             showNotificationDot = settings.notificationDots,
                             onClick = { onAppClick(app) },
@@ -239,6 +244,7 @@ fun HomeScreen(
                 settings = settings,
                 dockApps = dockApps,
                 iconSizeDp = iconBaseDp,
+                iconShape = iconShape,
                 forceMonochrome = settings.forceMonochrome && settings.themedIcons,
                 onAppClick = onAppClick,
                 onOpenDrawer = onOpenDrawer,
@@ -277,6 +283,7 @@ fun HomeScreen(
             val app = selectedAppForPopup!!
             AppItemContextMenu(
                 app = app,
+                iconShape = iconShape,
                 onDismiss = { selectedAppForPopup = null },
                 onOpenApp = {
                     selectedAppForPopup = null
@@ -491,6 +498,7 @@ fun DesktopAppIcon(
     fontSizeSp: androidx.compose.ui.unit.TextUnit,
     showLabel: Boolean,
     maxLines: Int,
+    iconShape: Shape = CircleShape,
     forceMonochrome: Boolean,
     showNotificationDot: Boolean = false,
     onClick: () -> Unit,
@@ -514,6 +522,7 @@ fun DesktopAppIcon(
         AppIconBadge(
             app = app,
             sizeDp = iconSizeDp,
+            shape = iconShape,
             forceMonochrome = forceMonochrome,
             showNotificationDot = showNotificationDot
         )
@@ -539,6 +548,7 @@ fun HotseatDock(
     settings: LauncherSettings,
     dockApps: List<AppItem>,
     iconSizeDp: androidx.compose.ui.unit.Dp,
+    iconShape: Shape = CircleShape,
     forceMonochrome: Boolean,
     onAppClick: (AppItem) -> Unit,
     onOpenDrawer: () -> Unit,
@@ -568,6 +578,7 @@ fun HotseatDock(
                     fontSizeSp = 10.sp,
                     showLabel = false,
                     maxLines = 1,
+                    iconShape = iconShape,
                     forceMonochrome = forceMonochrome,
                     showNotificationDot = settings.notificationDots,
                     onClick = { onAppClick(app) },
@@ -680,6 +691,7 @@ fun DesktopContextMenu(
 @Composable
 fun AppItemContextMenu(
     app: AppItem,
+    iconShape: Shape = CircleShape,
     onDismiss: () -> Unit,
     onOpenApp: () -> Unit,
     onOpenAppInfo: () -> Unit,
@@ -695,7 +707,7 @@ fun AppItemContextMenu(
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    AppIconBadge(app = app, sizeDp = 40.dp)
+                    AppIconBadge(app = app, sizeDp = 40.dp, shape = iconShape)
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = app.label,

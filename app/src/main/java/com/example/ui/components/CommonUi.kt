@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -345,6 +346,7 @@ fun LauncherToast(
 fun AppIconBadge(
     app: com.example.model.AppItem,
     sizeDp: Dp = 48.dp,
+    shape: Shape = CircleShape,
     forceMonochrome: Boolean = false,
     showNotificationDot: Boolean = false,
     modifier: Modifier = Modifier
@@ -365,7 +367,8 @@ fun AppIconBadge(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFFE2E8F0), CircleShape)
+                        .clip(shape)
+                        .background(Color(0xFFE2E8F0))
                 ) {
                     Image(
                         bitmap = realBitmap,
@@ -378,7 +381,9 @@ fun AppIconBadge(
                 Image(
                     bitmap = realBitmap,
                     contentDescription = null,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(shape)
                 )
             }
         } else {
@@ -389,7 +394,8 @@ fun AppIconBadge(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(color = bg, shape = CircleShape)
+                    .clip(shape)
+                    .background(color = bg)
             ) {
                 if (app.iconVector != null) {
                     Icon(

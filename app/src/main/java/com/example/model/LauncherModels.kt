@@ -24,6 +24,7 @@ data class AppItem(
 data class LauncherSettings(
     // Icons
     val iconPack: String = "Default",
+    val iconShape: String = "Circle",
     val themedIcons: Boolean = false,
     val themedIconsInDrawer: Boolean = false,
     val forceMonochrome: Boolean = true,
@@ -70,6 +71,8 @@ data class LauncherSettings(
     val iconLabelsInDrawer: Boolean = true,
     val drawerRowHeight: Int = 75,
     val drawerBackgroundOpacity: Int = 30,
+    val drawerGridColumns: Int = 6,
+    val drawerGridRows: Int = 9,
 
     // Gestures
     val shakeGestureAction: Int = 0,

@@ -42,6 +42,9 @@ import androidx.compose.material.icons.outlined.Widgets
 import com.example.model.AppItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -86,26 +89,31 @@ class AppRepository(private val context: Context) {
             emptyList()
         }
 
-        val deviceApps = resolveInfos.mapNotNull { resolveInfo ->
-            try {
-                val packageName = resolveInfo.activityInfo.packageName
-                if (packageName == context.packageName) return@mapNotNull null
+        val chunks = resolveInfos.chunked(16)
+        val deviceApps = chunks.map { chunk ->
+            async(Dispatchers.IO) {
+                chunk.mapNotNull { resolveInfo ->
+                    try {
+                        val packageName = resolveInfo.activityInfo.packageName
+                        if (packageName == context.packageName) return@mapNotNull null
 
-                val label = resolveInfo.loadLabel(packageManager).toString()
-                val iconDrawable = resolveInfo.loadIcon(packageManager)
-                val iconBitmap = IconUtils.drawableToImageBitmap(iconDrawable, packageName)
-                AppItem(
-                    packageName = packageName,
-                    activityName = resolveInfo.activityInfo.name,
-                    label = label,
-                    iconDrawable = iconDrawable,
-                    iconBitmap = iconBitmap,
-                    isSystemApp = false
-                )
-            } catch (e: Exception) {
-                null
+                        val label = resolveInfo.loadLabel(packageManager).toString()
+                        val iconDrawable = resolveInfo.loadIcon(packageManager)
+                        val iconBitmap = IconUtils.drawableToImageBitmap(iconDrawable, packageName)
+                        AppItem(
+                            packageName = packageName,
+                            activityName = resolveInfo.activityInfo.name,
+                            label = label,
+                            iconDrawable = iconDrawable,
+                            iconBitmap = iconBitmap,
+                            isSystemApp = false
+                        )
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
             }
-        }.distinctBy { it.uniqueKey }
+        }.awaitAll().flatten().distinctBy { it.uniqueKey }
         .sortedBy { it.label.lowercase() }
 
         val result = if (deviceApps.isNotEmpty()) {

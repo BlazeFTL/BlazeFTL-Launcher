@@ -17,6 +17,7 @@ class LauncherPreferencesRepository(context: Context) {
     private fun loadSettings(): LauncherSettings {
         return LauncherSettings(
             iconPack = prefs.getString("iconPack", "Default") ?: "Default",
+            iconShape = prefs.getString("iconShape", "Circle") ?: "Circle",
             themedIcons = prefs.getBoolean("themedIcons", false),
             themedIconsInDrawer = prefs.getBoolean("themedIconsInDrawer", false),
             forceMonochrome = prefs.getBoolean("forceMonochrome", true),
@@ -58,6 +59,8 @@ class LauncherPreferencesRepository(context: Context) {
             iconLabelsInDrawer = prefs.getBoolean("iconLabelsInDrawer", true),
             drawerRowHeight = prefs.getInt("drawerRowHeight", 75),
             drawerBackgroundOpacity = prefs.getInt("drawerBackgroundOpacity", 30),
+            drawerGridColumns = prefs.getInt("drawerGridColumns", 6),
+            drawerGridRows = prefs.getInt("drawerGridRows", 9),
 
             shakeGestureAction = prefs.getInt("shakeGestureAction", 0),
             shakeGestureIntensity = prefs.getInt("shakeGestureIntensity", 4),
@@ -86,6 +89,7 @@ class LauncherPreferencesRepository(context: Context) {
         _settings.value = newSettings
         prefs.edit().apply {
             putString("iconPack", newSettings.iconPack)
+            putString("iconShape", newSettings.iconShape)
             putBoolean("themedIcons", newSettings.themedIcons)
             putBoolean("themedIconsInDrawer", newSettings.themedIconsInDrawer)
             putBoolean("forceMonochrome", newSettings.forceMonochrome)
@@ -127,6 +131,8 @@ class LauncherPreferencesRepository(context: Context) {
             putBoolean("iconLabelsInDrawer", newSettings.iconLabelsInDrawer)
             putInt("drawerRowHeight", newSettings.drawerRowHeight)
             putInt("drawerBackgroundOpacity", newSettings.drawerBackgroundOpacity)
+            putInt("drawerGridColumns", newSettings.drawerGridColumns)
+            putInt("drawerGridRows", newSettings.drawerGridRows)
 
             putInt("shakeGestureAction", newSettings.shakeGestureAction)
             putInt("shakeGestureIntensity", newSettings.shakeGestureIntensity)

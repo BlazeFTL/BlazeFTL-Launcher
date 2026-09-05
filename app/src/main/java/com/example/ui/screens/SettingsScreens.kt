@@ -74,6 +74,7 @@ import com.example.ui.components.SettingNavigationItem
 import com.example.ui.components.SettingSliderItem
 import com.example.ui.components.SettingToggleItem
 import com.example.ui.components.SettingsBgColor
+import com.example.util.IconShapeHelper
 import com.example.ui.components.SettingsCardContainer
 import com.example.ui.components.SettingsTopBar
 
@@ -171,6 +172,7 @@ fun IconsSettingsScreen(
 ) {
     var showIconPackDialog by remember { mutableStateOf(false) }
     var showThemedIconsDialog by remember { mutableStateOf(false) }
+    var showIconShapeDialog by remember { mutableStateOf(false) }
 
     val iconPacks = listOf(
         "Default" to "System default app icons",
@@ -196,6 +198,14 @@ fun IconsSettingsScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         SettingsCardContainer {
+            SectionHeader(title = "Shape & Style")
+
+            SettingNavigationItem(
+                title = "Icon shape",
+                subtitle = "Selected: ${settings.iconShape} (32 distinct shapes)",
+                onClick = { showIconShapeDialog = true }
+            )
+            HorizontalDivider(color = Color(0xFFF3ECE7))
             SettingNavigationItem(
                 title = "Icon pack",
                 subtitle = settings.iconPack,
@@ -221,7 +231,11 @@ fun IconsSettingsScreen(
                 checked = settings.forceMonochrome,
                 onCheckedChange = { onUpdate(settings.copy(forceMonochrome = it)) }
             )
-            HorizontalDivider(color = Color(0xFFF3ECE7))
+        }
+
+        SettingsCardContainer {
+            SectionHeader(title = "Sizing & Badges (Connected)")
+
             SettingNavigationItem(
                 title = "Notification dots",
                 subtitle = if (settings.notificationDots) "Enabled" else "Disabled (Tap to toggle)",
@@ -232,7 +246,7 @@ fun IconsSettingsScreen(
                 title = "Icon size",
                 value = settings.iconSizePercent,
                 valueRange = 50f..150f,
-                displayValue = "Value: ${settings.iconSizePercent} % ↺",
+                displayValue = "${settings.iconSizePercent.toInt()}% (Home Screen & Drawer)",
                 onValueChange = { onUpdate(settings.copy(iconSizePercent = it)) }
             )
             HorizontalDivider(color = Color(0xFFF3ECE7))
@@ -240,7 +254,7 @@ fun IconsSettingsScreen(
                 title = "Font size",
                 value = settings.fontSizePercent,
                 valueRange = 50f..150f,
-                displayValue = "Value: ${settings.fontSizePercent} % ↺",
+                displayValue = "${settings.fontSizePercent.toInt()}% (Home Screen & Drawer)",
                 onValueChange = { onUpdate(settings.copy(fontSizePercent = it)) }
             )
             HorizontalDivider(color = Color(0xFFF3ECE7))
@@ -384,6 +398,82 @@ fun IconsSettingsScreen(
                     Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                         androidx.compose.material3.TextButton(onClick = { showThemedIconsDialog = false }) {
                             Text("Cancel", color = com.example.ui.components.CoralAccent)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showIconShapeDialog) {
+        Dialog(onDismissRequest = { showIconShapeDialog = false }) {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                modifier = Modifier.fillMaxWidth(0.95f).heightIn(max = 560.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        text = "Choose Icon Shape",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF231F20)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "32 distinct shapes applied across Home Screen & App Drawer",
+                        fontSize = 12.sp,
+                        color = Color(0xFF757575)
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    LazyColumn(
+                        modifier = Modifier.weight(1f, fill = false),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(IconShapeHelper.SHAPES) { shapeName ->
+                            val isSelected = settings.iconShape == shapeName
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        onUpdate(settings.copy(iconShape = shapeName))
+                                        showIconShapeDialog = false
+                                    }
+                                    .padding(vertical = 8.dp, horizontal = 6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(IconShapeHelper.getShape(shapeName))
+                                        .background(if (isSelected) CoralAccent else Color(0xFFE2E7EC))
+                                )
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Text(
+                                    text = shapeName,
+                                    fontSize = 15.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) CoralAccent else Color(0xFF231F20),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = {
+                                        onUpdate(settings.copy(iconShape = shapeName))
+                                        showIconShapeDialog = false
+                                    },
+                                    colors = RadioButtonDefaults.colors(selectedColor = CoralAccent)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                        TextButton(onClick = { showIconShapeDialog = false }) {
+                            Text("Cancel", color = CoralAccent)
                         }
                     }
                 }
@@ -761,18 +851,22 @@ fun AppDrawerSettingsScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         SettingsCardContainer {
-            SettingToggleItem(
-                title = "App search bar",
-                subtitle = "Search bar on top of the app drawer",
-                checked = settings.appSearchBar,
-                onCheckedChange = { onUpdate(settings.copy(appSearchBar = it)) }
+            SectionHeader(title = "App drawer grid")
+
+            SettingSliderItem(
+                title = "Grid columns",
+                value = settings.drawerGridColumns,
+                valueRange = 3f..7f,
+                displayValue = "${settings.drawerGridColumns} columns (Up to 7)",
+                onValueChange = { onUpdate(settings.copy(drawerGridColumns = it)) }
             )
             HorizontalDivider(color = Color(0xFFF3ECE7))
-            SettingToggleItem(
-                title = "Icon labels in drawer",
-                subtitle = "Show labels below icons in app drawer",
-                checked = settings.iconLabelsInDrawer,
-                onCheckedChange = { onUpdate(settings.copy(iconLabelsInDrawer = it)) }
+            SettingSliderItem(
+                title = "Grid rows",
+                value = settings.drawerGridRows,
+                valueRange = 4f..10f,
+                displayValue = "${settings.drawerGridRows} rows (Up to 10)",
+                onValueChange = { onUpdate(settings.copy(drawerGridRows = it)) }
             )
             HorizontalDivider(color = Color(0xFFF3ECE7))
             SettingSliderItem(
@@ -789,6 +883,31 @@ fun AppDrawerSettingsScreen(
                 valueRange = 20f..100f,
                 displayValue = "Value: ${settings.drawerBackgroundOpacity} % (by default)",
                 onValueChange = { onUpdate(settings.copy(drawerBackgroundOpacity = it)) }
+            )
+        }
+
+        SettingsCardContainer {
+            SectionHeader(title = "Appearance & Search")
+
+            SettingToggleItem(
+                title = "App search bar",
+                subtitle = "Search bar on top of the app drawer",
+                checked = settings.appSearchBar,
+                onCheckedChange = { onUpdate(settings.copy(appSearchBar = it)) }
+            )
+            HorizontalDivider(color = Color(0xFFF3ECE7))
+            SettingToggleItem(
+                title = "Icon labels in drawer",
+                subtitle = "Show labels below icons in app drawer",
+                checked = settings.iconLabelsInDrawer,
+                onCheckedChange = { onUpdate(settings.copy(iconLabelsInDrawer = it)) }
+            )
+            HorizontalDivider(color = Color(0xFFF3ECE7))
+            SettingToggleItem(
+                title = "Apply themed icons to app drawer",
+                subtitle = "Follow themed icons and monochrome styling",
+                checked = settings.themedIconsInDrawer,
+                onCheckedChange = { onUpdate(settings.copy(themedIconsInDrawer = it)) }
             )
         }
 
