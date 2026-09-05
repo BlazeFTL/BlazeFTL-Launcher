@@ -83,6 +83,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
@@ -92,6 +93,7 @@ import com.example.model.AppItem
 import com.example.model.LauncherSettings
 import com.example.ui.components.AppIconBadge
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 @Composable
 fun AppDrawerScreen(
@@ -148,35 +150,36 @@ fun AppDrawerScreen(
     val gridState = rememberLazyGridState()
     val navBarBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-    var isGestureStartedAtTop by remember { mutableStateOf(false) }
     var accumulatedPullDown by remember { mutableFloatStateOf(0f) }
 
-    // Nested scroll connection: Only close with pull down if the gesture started while ALREADY at the top
-    val pullDownConnection = remember {
+    // Responsive pull down to close connection:
+    // When at the top (scrollbar at absolute top right, index 0, offset 0),
+    // any downward pull immediately closes the drawer with zero delay and no 2-swipe requirement!
+    val pullDownConnection = remember(gridState) {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // If the gesture started while already at top, and user is pulling down
-                if (isGestureStartedAtTop && available.y > 0f) {
+                // If scrollbar/grid is at the absolute top
+                val isAtTop = gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
+                if (isAtTop && available.y > 0f) {
                     accumulatedPullDown += available.y
-                    if (accumulatedPullDown > 22f) {
+                    if (accumulatedPullDown > 18f) { // ~8-10dp responsive threshold
                         accumulatedPullDown = 0f
-                        isGestureStartedAtTop = false
                         onCloseDrawer()
                         return Offset(0f, available.y)
                     }
-                } else if (available.y < -5f) {
+                } else if (available.y < -4f) {
                     accumulatedPullDown = 0f
                 }
                 return Offset.Zero
             }
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                // Only close if gesture started at top. If user was scrolling up from below, it stops at top and NEVER closes.
-                if (isGestureStartedAtTop && available.y > 0f) {
+                // If scrolling up reaches the top during the gesture, any remaining downward pull immediately closes:
+                val isAtTop = gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
+                if (isAtTop && available.y > 0f) {
                     accumulatedPullDown += available.y
-                    if (accumulatedPullDown > 18f) {
+                    if (accumulatedPullDown > 16f) {
                         accumulatedPullDown = 0f
-                        isGestureStartedAtTop = false
                         onCloseDrawer()
                         return Offset(0f, available.y)
                     }
@@ -186,12 +189,11 @@ fun AppDrawerScreen(
 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
                 accumulatedPullDown = 0f
-                if (isGestureStartedAtTop && available.y > 60f) {
-                    isGestureStartedAtTop = false
+                val isAtTop = gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
+                if (isAtTop && available.y > 60f) {
                     onCloseDrawer()
                     return Velocity(0f, available.y)
                 }
-                isGestureStartedAtTop = false
                 return Velocity.Zero
             }
         }
@@ -200,24 +202,6 @@ fun AppDrawerScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
-                    // At the exact moment finger touches down: was the grid already resting at top?
-                    val atTop = !gridState.canScrollBackward && 
-                        gridState.firstVisibleItemIndex == 0 && 
-                        gridState.firstVisibleItemScrollOffset == 0
-                    isGestureStartedAtTop = atTop
-                    accumulatedPullDown = 0f
-
-                    do {
-                        val event = awaitPointerEvent()
-                    } while (event.changes.any { it.pressed })
-
-                    isGestureStartedAtTop = false
-                    accumulatedPullDown = 0f
-                }
-            }
             .nestedScroll(pullDownConnection)
     ) {
         Column(
@@ -597,7 +581,6 @@ fun DrawerScrollBar(
         }
     }
 
-    val activeFraction = if (isDragging) dragProgress else scrollFraction
     val trackColor = if (isLightBackground) Color(0x20000000) else Color(0x30FFFFFF)
     val thumbColor = if (isLightBackground) Color(0xFF64748B) else Color.White.copy(alpha = 0.85f)
 
@@ -627,7 +610,6 @@ fun DrawerScrollBar(
         val totalHeight = maxHeight
         val thumbHeight = 42.dp
         val availableTravel = totalHeight - thumbHeight
-        val thumbOffset = availableTravel * activeFraction
 
         // Vertical Track line
         Box(
@@ -639,11 +621,15 @@ fun DrawerScrollBar(
                 .background(trackColor)
         )
 
-        // Draggable Thumb Indicator
+        // Draggable Thumb Indicator (layout-time offset prevents recomposing the tree during scroll)
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .offset(y = thumbOffset)
+                .offset {
+                    val availablePx = availableTravel.toPx()
+                    val fraction = if (isDragging) dragProgress else scrollFraction
+                    IntOffset(0, (availablePx * fraction).roundToInt())
+                }
                 .width(4.dp)
                 .height(thumbHeight)
                 .clip(RoundedCornerShape(3.dp))
@@ -657,7 +643,12 @@ fun DrawerScrollBar(
             exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .offset(x = (-34).dp, y = (thumbOffset - 8.dp).coerceAtLeast(0.dp))
+                .offset {
+                    val availablePx = availableTravel.toPx()
+                    val fraction = if (isDragging) dragProgress else scrollFraction
+                    val y = ((availablePx * fraction) - 8.dp.toPx()).roundToInt().coerceAtLeast(0)
+                    IntOffset((-34).dp.roundToPx(), y)
+                }
         ) {
             Box(
                 contentAlignment = Alignment.Center,

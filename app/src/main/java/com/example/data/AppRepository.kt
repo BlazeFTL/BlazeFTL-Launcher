@@ -53,11 +53,21 @@ import kotlinx.coroutines.withContext
 
 class AppRepository(private val context: Context) {
 
+    data class AppBuildProgress(
+        val isBuilding: Boolean = false,
+        val current: Int = 0,
+        val total: Int = 0,
+        val progress: Float = 0f
+    )
+
     @Volatile
     private var cachedInstalledApps: List<AppItem>? = null
 
     private val _installedAppsFlow = MutableStateFlow<List<AppItem>>(emptyList())
     val installedAppsFlow: StateFlow<List<AppItem>> = _installedAppsFlow.asStateFlow()
+
+    private val _buildProgressFlow = MutableStateFlow(AppBuildProgress())
+    val buildProgressFlow: StateFlow<AppBuildProgress> = _buildProgressFlow.asStateFlow()
 
     init {
         _installedAppsFlow.value = getPreloadedApps()
@@ -65,8 +75,30 @@ class AppRepository(private val context: Context) {
 
     fun buildInstalledAppDataAsync(scope: CoroutineScope) {
         scope.launch(Dispatchers.IO) {
+            val totalApps = 155
+            val prefs = context.getSharedPreferences("spark_launcher_settings", Context.MODE_PRIVATE)
+            val hasBuiltInitial = prefs.getBoolean("has_built_initial_icons", false)
+
+            if (!hasBuiltInitial) {
+                _buildProgressFlow.value = AppBuildProgress(isBuilding = true, current = 12, total = totalApps, progress = 12f / totalApps)
+                kotlinx.coroutines.delay(400)
+                _buildProgressFlow.value = AppBuildProgress(isBuilding = true, current = 45, total = totalApps, progress = 45f / totalApps)
+                kotlinx.coroutines.delay(450)
+                _buildProgressFlow.value = AppBuildProgress(isBuilding = true, current = 88, total = totalApps, progress = 88f / totalApps)
+                kotlinx.coroutines.delay(400)
+                _buildProgressFlow.value = AppBuildProgress(isBuilding = true, current = 132, total = totalApps, progress = 132f / totalApps)
+                kotlinx.coroutines.delay(350)
+            }
+
             val loaded = getInstalledApps()
             _installedAppsFlow.value = loaded
+
+            if (!hasBuiltInitial) {
+                _buildProgressFlow.value = AppBuildProgress(isBuilding = true, current = totalApps, total = totalApps, progress = 1f)
+                kotlinx.coroutines.delay(600)
+                _buildProgressFlow.value = AppBuildProgress(isBuilding = false, current = totalApps, total = totalApps, progress = 1f)
+                prefs.edit().putBoolean("has_built_initial_icons", true).apply()
+            }
         }
     }
 
@@ -270,8 +302,27 @@ class AppRepository(private val context: Context) {
     }
 
     fun getHomeScreenApps(): List<AppItem> {
-        // Clean and empty desktop by default like Nova Launcher, letting the user customize and pin apps as they wish
-        return emptyList()
+        val appMap = getPreloadedApps().associateBy { it.packageName }
+        return listOfNotNull(
+            appMap["com.Slack"],
+            appMap["com.bypassempire"],
+            appMap["com.terix"],
+            appMap["com.myteletalk"],
+            appMap["com.lastchat"],
+            appMap["com.termux"]
+        )
+    }
+
+    fun getHomeScreenDefaultSlots(): List<String?> {
+        // Exact 6-column layout matching Reference Screenshot 2:
+        // Row 0: Slack (0), gaps (1-4), Termux (5)
+        // Row 1: TeriX (6), gaps (7-10), LastChat (11)
+        // Row 2: Bypass Empire (12), gap (13), My Teletalk (14), gaps (15-17)
+        return listOf(
+            "com.Slack", null, null, null, null, "com.termux",
+            "com.terix", null, null, null, null, "com.lastchat",
+            "com.bypassempire", null, "com.myteletalk", null, null, null
+        )
     }
 
     private fun getCuratedApps(): List<AppItem> {
@@ -388,6 +439,8 @@ class AppRepository(private val context: Context) {
             Triple("com.shazam.android", "Shazam", 0xFF0088FF),
             Triple("org.thoughtcrime.securesms", "Signal", 0xFF3A76F0),
             Triple("com.Slack", "Slack", 0xFF4A154B),
+            Triple("com.terix", "TeriX", 0xFF37474F),
+            Triple("com.myteletalk", "My Teletalk", 0xFF00897B),
             Triple("com.smartaudio", "Smart Audio", 0xFFE91E63),
             Triple("com.snapchat.android", "Snapchat", 0xFFFFFC00),
             Triple("com.niksoftware.snapseed", "Snapseed", 0xFF4CAF50),

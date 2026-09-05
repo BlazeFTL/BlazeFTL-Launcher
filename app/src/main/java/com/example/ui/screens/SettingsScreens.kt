@@ -714,7 +714,10 @@ fun GesturesSettingsScreen(
         2 to "Open Recents Overview",
         3 to "Open Launcher Settings",
         4 to "Quick Lock Screen",
-        5 to "Open Wallpaper Picker"
+        5 to "Open Wallpaper Picker",
+        6 to "Shake to Fill Empty Space (Compact Apps)",
+        7 to "Shake to Rearrange by App Name (A - Z)",
+        8 to "Shake to Rearrange by App Type / Category"
     )
 
     val currentActionLabel = gestureActions.firstOrNull { it.first == settings.shakeGestureAction }?.second ?: "None (Disabled)"

@@ -166,4 +166,14 @@ class LauncherPreferencesRepository(context: Context) {
     fun saveHomeScreenPackages(packages: List<String>) {
         prefs.edit().putString("home_screen_packages", packages.joinToString(",")).apply()
     }
+
+    fun getHomeScreenSlots(): List<String?>? {
+        val saved = prefs.getString("home_screen_slots_layout", null) ?: return null
+        return saved.split(",").map { if (it == "__EMPTY__" || it.isBlank()) null else it }
+    }
+
+    fun saveHomeScreenSlots(slots: List<String?>) {
+        val str = slots.map { it ?: "__EMPTY__" }.joinToString(",")
+        prefs.edit().putString("home_screen_slots_layout", str).apply()
+    }
 }

@@ -2,8 +2,10 @@ package com.example.util
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.os.Build
 import androidx.collection.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -21,7 +23,20 @@ object IconUtils {
 
         val targetSize = 144
         val bitmap = try {
-            if (drawable is BitmapDrawable && drawable.bitmap != null && !drawable.bitmap.isRecycled) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && drawable is AdaptiveIconDrawable) {
+                val bmp = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bmp)
+                drawable.background?.let { bg ->
+                    bg.setBounds(0, 0, targetSize, targetSize)
+                    bg.draw(canvas)
+                }
+                drawable.foreground?.let { fg ->
+                    val inset = (targetSize * 0.15f).toInt()
+                    fg.setBounds(inset, inset, targetSize - inset, targetSize - inset)
+                    fg.draw(canvas)
+                }
+                bmp
+            } else if (drawable is BitmapDrawable && drawable.bitmap != null && !drawable.bitmap.isRecycled) {
                 val src = drawable.bitmap
                 if (src.width <= targetSize && src.height <= targetSize) {
                     src

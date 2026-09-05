@@ -27,21 +27,26 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.ViewCarousel
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material.icons.filled.Widgets
@@ -95,7 +100,7 @@ import androidx.compose.ui.geometry.Offset
 @Composable
 fun HomeScreen(
     settings: LauncherSettings,
-    homeApps: List<AppItem>,
+    homeApps: List<AppItem?>,
     dockApps: List<AppItem>,
     isMusicPlaying: Boolean = false,
     onAppClick: (AppItem) -> Unit,
@@ -106,6 +111,10 @@ fun HomeScreen(
     onOpenAppInfo: (String) -> Unit,
     onUninstallApp: (String) -> Unit,
     onRemoveFromHome: (String) -> Unit,
+    onFillEmptySpaces: () -> Unit = {},
+    onRearrangeByName: () -> Unit = {},
+    onRearrangeByType: () -> Unit = {},
+    onResetToSS2Layout: () -> Unit = {},
     onExpandQuickSettings: () -> Unit,
     onShowToast: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -214,25 +223,45 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp)
                 ) {
-                    items(homeApps, key = { it.uniqueKey }, contentType = { "desktop_app" }) { app ->
-                        DesktopAppIcon(
-                            app = app,
-                            iconSizeDp = iconBaseDp,
-                            fontSizeSp = fontSizeSp,
-                            showLabel = settings.iconLabelsOnDesktop,
-                            maxLines = settings.maxLabelLines,
-                            iconShape = iconShape,
-                            forceMonochrome = settings.forceMonochrome && settings.themedIcons,
-                            showNotificationDot = settings.notificationDots,
-                            onClick = { onAppClick(app) },
-                            onLongClick = {
-                                if (settings.lockLayout) {
-                                    onShowToast("Desktop layout is locked in settings")
-                                } else {
-                                    selectedAppForPopup = app
+                    itemsIndexed(
+                        items = homeApps,
+                        key = { index, app -> app?.uniqueKey ?: "empty_slot_$index" },
+                        contentType = { _, app -> if (app != null) "desktop_app" else "empty_slot" }
+                    ) { index, app ->
+                        if (app != null) {
+                            DesktopAppIcon(
+                                app = app,
+                                iconSizeDp = iconBaseDp,
+                                fontSizeSp = fontSizeSp,
+                                showLabel = settings.iconLabelsOnDesktop,
+                                maxLines = settings.maxLabelLines,
+                                iconShape = iconShape,
+                                forceMonochrome = settings.forceMonochrome && settings.themedIcons,
+                                showNotificationDot = settings.notificationDots,
+                                onClick = { onAppClick(app) },
+                                onLongClick = {
+                                    if (settings.lockLayout) {
+                                        onShowToast("Desktop layout is locked in settings")
+                                    } else {
+                                        selectedAppForPopup = app
+                                    }
                                 }
-                            }
-                        )
+                            )
+                        } else {
+                            // Empty space slot to preserve gap layout like SS 2
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(iconBaseDp + 24.dp)
+                                    .pointerInput(index) {
+                                        detectTapGestures(
+                                            onLongPress = {
+                                                showDesktopMenu = true
+                                            }
+                                        )
+                                    }
+                            )
+                        }
                     }
                 }
             }
@@ -273,6 +302,22 @@ fun HomeScreen(
                 onOpenWallpaper = {
                     showDesktopMenu = false
                     onOpenWallpaper()
+                },
+                onFillEmptySpaces = {
+                    showDesktopMenu = false
+                    onFillEmptySpaces()
+                },
+                onRearrangeByName = {
+                    showDesktopMenu = false
+                    onRearrangeByName()
+                },
+                onRearrangeByType = {
+                    showDesktopMenu = false
+                    onRearrangeByType()
+                },
+                onResetToSS2Layout = {
+                    showDesktopMenu = false
+                    onResetToSS2Layout()
                 },
                 onShowToast = onShowToast
             )
@@ -647,13 +692,17 @@ fun DesktopContextMenu(
     onDismiss: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenWallpaper: () -> Unit,
+    onFillEmptySpaces: () -> Unit = {},
+    onRearrangeByName: () -> Unit = {},
+    onRearrangeByType: () -> Unit = {},
+    onResetToSS2Layout: () -> Unit = {},
     onShowToast: (String) -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = Color.White),
-            modifier = Modifier.fillMaxWidth(0.88f)
+            modifier = Modifier.fillMaxWidth(0.92f)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
@@ -664,6 +713,30 @@ fun DesktopContextMenu(
                     modifier = Modifier.padding(bottom = 12.dp, start = 8.dp)
                 )
 
+                ContextMenuItem(
+                    icon = Icons.Default.AutoAwesome,
+                    label = "Fill Empty Spaces (Compact Apps)",
+                    onClick = onFillEmptySpaces,
+                    testTag = "menu_fill_empty_spaces"
+                )
+                ContextMenuItem(
+                    icon = Icons.Default.SortByAlpha,
+                    label = "Rearrange by App Name (A - Z)",
+                    onClick = onRearrangeByName,
+                    testTag = "menu_rearrange_name"
+                )
+                ContextMenuItem(
+                    icon = Icons.Default.Category,
+                    label = "Rearrange by App Category",
+                    onClick = onRearrangeByType,
+                    testTag = "menu_rearrange_type"
+                )
+                ContextMenuItem(
+                    icon = Icons.Default.Restore,
+                    label = "Reset to Reference Layout (SS 2)",
+                    onClick = onResetToSS2Layout,
+                    testTag = "menu_reset_ss2"
+                )
                 ContextMenuItem(
                     icon = Icons.Default.Settings,
                     label = "Home settings",
