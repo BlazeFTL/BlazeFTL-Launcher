@@ -83,6 +83,7 @@ import androidx.compose.ui.zIndex
 import com.example.data.AppRepository
 import com.example.data.LauncherPreferencesRepository
 import com.example.model.AppItem
+import com.example.model.DesktopItem
 import com.example.model.LauncherScreen
 import com.example.ui.components.LauncherToast
 import com.example.ui.screens.AppDrawerScreen
@@ -181,12 +182,57 @@ fun SparkLauncherApp(
     val dockApps = remember(installedApps) { appRepo.getDockApps() }
     
     val homeAppsList = remember { mutableStateListOf<AppItem?>() }
+    val homeDesktopSlots = remember { mutableStateListOf<DesktopItem?>() }
+
+    fun resolveSlot(slotStr: String?, appMap: Map<String, AppItem>): DesktopItem? {
+        if (slotStr == null) return null
+        if (slotStr.startsWith("folder:")) {
+            val parts = slotStr.split(":", limit = 3)
+            val title = parts.getOrNull(1) ?: "Folder"
+            val packages = parts.getOrNull(2)?.split("|") ?: emptyList()
+            val folderApps = packages.mapNotNull { pkg ->
+                appMap[pkg] ?: appRepo.getPreloadedApps().find { it.packageName == pkg }
+            }
+            return DesktopItem.Folder(
+                id = "folder_${title}_${packages.hashCode()}",
+                title = title,
+                apps = folderApps
+            )
+        }
+        val app = appMap[slotStr] ?: appRepo.getPreloadedApps().find { it.packageName == slotStr }
+        return app?.let { DesktopItem.App(it) }
+    }
+
+    fun saveDesktopSlots() {
+        val savedStrings = homeDesktopSlots.map { item ->
+            when (item) {
+                is DesktopItem.App -> item.app.packageName
+                is DesktopItem.Folder -> "folder:${item.title}:${item.apps.joinToString("|") { it.packageName }}"
+                null -> null
+            }
+        }
+        prefsRepo.saveHomeScreenSlots(savedStrings)
+    }
+
+    // Initial desktop initialization (synchronous for immediate preview)
+    LaunchedEffect(Unit) {
+        if (homeDesktopSlots.isEmpty()) {
+            val savedSlots = prefsRepo.getHomeScreenSlots()
+            val allMap = appRepo.getPreloadedApps().associateBy { it.packageName }
+            if (savedSlots != null && savedSlots.isNotEmpty()) {
+                homeDesktopSlots.addAll(savedSlots.map { resolveSlot(it, allMap) })
+            } else {
+                val defaults = appRepo.getHomeScreenDefaultSlots(appRepo.getPreloadedApps())
+                homeDesktopSlots.addAll(defaults.map { resolveSlot(it, allMap) })
+            }
+        }
+    }
 
     val buildProgress by appRepo.buildProgressFlow.collectAsState()
     var isProgressBannerDismissed by remember { mutableStateOf(false) }
 
-    val visibleDrawerApps = remember(installedApps, homeAppsList.toList(), settings.hiddenAppPackages) {
-        val rawList = if (installedApps.isNotEmpty()) installedApps else homeAppsList.filterNotNull()
+    val visibleDrawerApps = remember(installedApps, homeDesktopSlots.toList(), settings.hiddenAppPackages) {
+        val rawList = if (installedApps.isNotEmpty()) installedApps else appRepo.getPreloadedApps()
         if (settings.hiddenAppPackages.isEmpty()) {
             rawList
         } else {
@@ -214,14 +260,12 @@ fun SparkLauncherApp(
             installedApps = repoInstalledApps
             val savedSlots = prefsRepo.getHomeScreenSlots()
             val appMap = repoInstalledApps.associateBy { it.packageName }
+            homeDesktopSlots.clear()
             if (savedSlots != null && savedSlots.isNotEmpty()) {
-                val restored = savedSlots.map { pkg -> pkg?.let { appMap[it] } }
-                homeAppsList.clear()
-                homeAppsList.addAll(restored)
+                homeDesktopSlots.addAll(savedSlots.map { resolveSlot(it, appMap) })
             } else {
-                val defaultSlots = appRepo.getHomeScreenDefaultSlots()
-                homeAppsList.clear()
-                homeAppsList.addAll(defaultSlots.map { pkg -> pkg?.let { appMap[it] } })
+                val defaultSlots = appRepo.getHomeScreenDefaultSlots(repoInstalledApps)
+                homeDesktopSlots.addAll(defaultSlots.map { resolveSlot(it, appMap) })
             }
             memoryInfoText = appRepo.getFormattedMemoryInfo()
         }
@@ -340,36 +384,51 @@ fun SparkLauncherApp(
     }
 
     val fillEmptySpaces: () -> Unit = {
-        val nonNullApps = homeAppsList.filterNotNull()
-        homeAppsList.clear()
-        homeAppsList.addAll(nonNullApps)
-        prefsRepo.saveHomeScreenSlots(homeAppsList.map { it?.packageName })
+        val nonNullItems = homeDesktopSlots.filterNotNull()
+        homeDesktopSlots.clear()
+        homeDesktopSlots.addAll(nonNullItems)
+        saveDesktopSlots()
         showToast("Empty spaces filled")
     }
 
     val rearrangeByName: () -> Unit = {
-        val sorted = homeAppsList.filterNotNull().sortedBy { it.label.lowercase() }
-        homeAppsList.clear()
-        homeAppsList.addAll(sorted)
-        prefsRepo.saveHomeScreenSlots(homeAppsList.map { it?.packageName })
+        val sorted = homeDesktopSlots.filterNotNull().sortedBy { item ->
+            when (item) {
+                is DesktopItem.App -> item.app.label.lowercase()
+                is DesktopItem.Folder -> item.title.lowercase()
+            }
+        }
+        homeDesktopSlots.clear()
+        homeDesktopSlots.addAll(sorted)
+        saveDesktopSlots()
         showToast("Rearranged by app name (A - Z)")
     }
 
     val rearrangeByType: () -> Unit = {
-        val sorted = homeAppsList.filterNotNull().sortedWith(compareBy({ it.isSystemApp }, { it.label.lowercase() }))
-        homeAppsList.clear()
-        homeAppsList.addAll(sorted)
-        prefsRepo.saveHomeScreenSlots(homeAppsList.map { it?.packageName })
+        val sorted = homeDesktopSlots.filterNotNull().sortedWith(compareBy({
+            when (it) {
+                is DesktopItem.App -> it.app.isSystemApp
+                is DesktopItem.Folder -> false
+            }
+        }, {
+            when (it) {
+                is DesktopItem.App -> it.app.label.lowercase()
+                is DesktopItem.Folder -> it.title.lowercase()
+            }
+        }))
+        homeDesktopSlots.clear()
+        homeDesktopSlots.addAll(sorted)
+        saveDesktopSlots()
         showToast("Rearranged by app type")
     }
 
     val resetToSS2Layout: () -> Unit = {
-        val defaultSlots = appRepo.getHomeScreenDefaultSlots()
-        val allApps = appRepo.getPreloadedApps().associateBy { it.packageName }
-        homeAppsList.clear()
-        homeAppsList.addAll(defaultSlots.map { pkg -> pkg?.let { allApps[it] } })
-        prefsRepo.saveHomeScreenSlots(defaultSlots)
-        showToast("Reset to layout with empty spaces")
+        val defaultSlots = appRepo.getHomeScreenDefaultSlots(installedApps)
+        val appMap = installedApps.associateBy { it.packageName }
+        homeDesktopSlots.clear()
+        homeDesktopSlots.addAll(defaultSlots.map { resolveSlot(it, appMap) })
+        saveDesktopSlots()
+        showToast("Reset to layout")
     }
 
     fun handleAppClick(app: AppItem) {
@@ -384,14 +443,21 @@ fun SparkLauncherApp(
 
     fun addAppToHomeScreen(packageName: String) {
         val app = installedApps.find { it.packageName == packageName } ?: return
-        if (!homeAppsList.any { it?.packageName == packageName }) {
-            val emptyIndex = homeAppsList.indexOfFirst { it == null }
-            if (emptyIndex != -1) {
-                homeAppsList[emptyIndex] = app
-            } else {
-                homeAppsList.add(app)
+        val exists = homeDesktopSlots.any { item ->
+            when (item) {
+                is DesktopItem.App -> item.app.packageName == packageName
+                is DesktopItem.Folder -> item.apps.any { it.packageName == packageName }
+                null -> false
             }
-            prefsRepo.saveHomeScreenSlots(homeAppsList.map { it?.packageName })
+        }
+        if (!exists) {
+            val emptyIndex = homeDesktopSlots.indexOfFirst { it == null }
+            if (emptyIndex != -1) {
+                homeDesktopSlots[emptyIndex] = DesktopItem.App(app)
+            } else {
+                homeDesktopSlots.add(DesktopItem.App(app))
+            }
+            saveDesktopSlots()
             showToast("Added ${app.label} to Home Screen")
         } else {
             showToast("${app.label} is already on Home Screen")
@@ -399,12 +465,15 @@ fun SparkLauncherApp(
     }
 
     fun removeAppFromHomeScreen(packageName: String) {
-        val index = homeAppsList.indexOfFirst { it?.packageName == packageName }
+        val index = homeDesktopSlots.indexOfFirst { item ->
+            item is DesktopItem.App && item.app.packageName == packageName
+        }
         if (index != -1) {
-            val removed = homeAppsList[index]
-            homeAppsList[index] = null
-            prefsRepo.saveHomeScreenSlots(homeAppsList.map { it?.packageName })
-            showToast("Removed ${removed?.label ?: "App"} from Home Screen")
+            val removed = homeDesktopSlots[index]
+            homeDesktopSlots[index] = null
+            saveDesktopSlots()
+            val label = (removed as? DesktopItem.App)?.app?.label ?: "App"
+            showToast("Removed $label from Home Screen")
         }
     }
 
@@ -438,7 +507,7 @@ fun SparkLauncherApp(
         // Base Home Screen (smoothly fades with GPU-accelerated graphicsLayer)
         HomeScreen(
             settings = settings,
-            homeApps = homeAppsList,
+            homeSlots = homeDesktopSlots.toList(),
             dockApps = dockApps,
             allApps = installedApps,
             nowPlayingTrack = nowPlayingTrack,

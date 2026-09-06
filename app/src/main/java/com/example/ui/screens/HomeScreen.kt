@@ -82,6 +82,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.R
 import com.example.model.AppItem
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.platform.LocalContext
+import android.os.BatteryManager
+import android.content.IntentFilter
+import java.util.Calendar
+import com.example.model.DesktopItem
 import com.example.model.LauncherScreen
 import com.example.model.LauncherSettings
 import com.example.ui.components.AppIconBadge
@@ -100,7 +107,8 @@ import androidx.compose.ui.geometry.Offset
 @Composable
 fun HomeScreen(
     settings: LauncherSettings,
-    homeApps: List<AppItem?>,
+    homeSlots: List<DesktopItem?> = emptyList(),
+    homeApps: List<AppItem?> = emptyList(),
     dockApps: List<AppItem>,
     allApps: List<AppItem> = emptyList(),
     nowPlayingTrack: com.example.model.NowPlayingTrack = com.example.model.NowPlayingTrack(),
@@ -122,27 +130,29 @@ fun HomeScreen(
 ) {
     var showDesktopMenu by remember { mutableStateOf(false) }
     var selectedAppForPopup by remember { mutableStateOf<AppItem?>(null) }
+    var openFolder by remember { mutableStateOf<DesktopItem.Folder?>(null) }
     val iconShape = remember(settings.iconShape) { IconShapeHelper.getShape(settings.iconShape) }
 
-    var totalDragY by remember { mutableStateOf(0f) }
+    val resolvedDesktopSlots = remember(homeSlots, homeApps) {
+        if (homeSlots.isNotEmpty()) {
+            homeSlots
+        } else {
+            homeApps.map { it?.let { app -> DesktopItem.App(app) } }
+        }
+    }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .draggable(
-                orientation = Orientation.Vertical,
-                state = rememberDraggableState { delta ->
-                    totalDragY += delta
-                    if (totalDragY < -24f) {
-                        totalDragY = 0f
+            .pointerInput(Unit) {
+                detectVerticalDragGestures { _, dragAmount ->
+                    if (dragAmount < -18f) {
                         onOpenDrawer()
-                    } else if (totalDragY > 48f) {
-                        totalDragY = 0f
+                    } else if (dragAmount > 36f) {
                         onExpandQuickSettings()
                     }
-                },
-                onDragStopped = { totalDragY = 0f }
-            )
+                }
+            }
             .pointerInput(Unit) {
                 detectTapGestures(
                     onLongPress = {
@@ -205,14 +215,28 @@ fun HomeScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.weight(1f))
+            // Middle screen area: also handles full-screen swipe up anywhere
+            Spacer(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .pointerInput(Unit) {
+                        detectVerticalDragGestures { _, dragAmount ->
+                            if (dragAmount < -15f) {
+                                onOpenDrawer()
+                            } else if (dragAmount > 30f) {
+                                onExpandQuickSettings()
+                            }
+                        }
+                    }
+            )
 
             // Desktop App Grid (Responsive 6 columns)
             val iconScale = (settings.iconSizePercent / 100f).coerceIn(0.5f, 1.5f)
             val iconBaseDp = (48 * iconScale).dp
             val fontSizeSp = (11.5f * (settings.fontSizePercent / 100f)).sp
 
-            if (homeApps.isNotEmpty()) {
+            if (resolvedDesktopSlots.isNotEmpty()) {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(6),
                     userScrollEnabled = false,
@@ -222,38 +246,72 @@ fun HomeScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp)
+                        .pointerInput(Unit) {
+                            detectVerticalDragGestures { _, dragAmount ->
+                                if (dragAmount < -18f) {
+                                    onOpenDrawer()
+                                }
+                            }
+                        }
                 ) {
                     itemsIndexed(
-                        items = homeApps,
-                        key = { index, app -> app?.uniqueKey ?: "empty_slot_$index" },
-                        contentType = { _, app -> if (app != null) "desktop_app" else "empty_slot" }
-                    ) { index, app ->
-                        if (app != null) {
-                            DesktopAppIcon(
-                                app = app,
-                                iconSizeDp = iconBaseDp,
-                                fontSizeSp = fontSizeSp,
-                                showLabel = settings.iconLabelsOnDesktop,
-                                maxLines = settings.maxLabelLines,
-                                iconShape = iconShape,
-                                forceMonochrome = settings.forceMonochrome && settings.themedIcons,
-                                showNotificationDot = settings.notificationDots,
-                                onClick = { onAppClick(app) },
-                                onLongClick = {
-                                    if (settings.lockLayout) {
-                                        onShowToast("Desktop layout is locked in settings")
-                                    } else {
-                                        selectedAppForPopup = app
+                        items = resolvedDesktopSlots,
+                        key = { index, item ->
+                            when (item) {
+                                is DesktopItem.App -> item.app.uniqueKey
+                                is DesktopItem.Folder -> item.id
+                                null -> "empty_slot_$index"
+                            }
+                        },
+                        contentType = { _, item ->
+                            when (item) {
+                                is DesktopItem.App -> "desktop_app"
+                                is DesktopItem.Folder -> "desktop_folder"
+                                null -> "empty_slot"
+                            }
+                        }
+                    ) { index, item ->
+                        when (item) {
+                            is DesktopItem.App -> {
+                                DesktopAppIcon(
+                                    app = item.app,
+                                    iconSizeDp = iconBaseDp,
+                                    fontSizeSp = fontSizeSp,
+                                    showLabel = settings.iconLabelsOnDesktop,
+                                    maxLines = settings.maxLabelLines,
+                                    iconShape = iconShape,
+                                    forceMonochrome = settings.forceMonochrome && settings.themedIcons,
+                                    showNotificationDot = settings.notificationDots,
+                                    onClick = { onAppClick(item.app) },
+                                    onLongClick = {
+                                        if (settings.lockLayout) {
+                                            onShowToast("Desktop layout is locked in settings")
+                                        } else {
+                                            selectedAppForPopup = item.app
+                                        }
                                     }
-                                }
-                            )
-                        } else {
-                            // Empty space slot to preserve gap layout like SS 2
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(iconBaseDp + 24.dp)
-                            )
+                                )
+                            }
+                            is DesktopItem.Folder -> {
+                                DesktopFolderIcon(
+                                    title = item.title,
+                                    apps = item.apps,
+                                    iconSizeDp = iconBaseDp,
+                                    fontSizeSp = fontSizeSp,
+                                    showLabel = settings.iconLabelsOnDesktop,
+                                    maxLines = settings.maxLabelLines,
+                                    iconShape = iconShape,
+                                    onClick = { openFolder = item },
+                                    onLongClick = { onShowToast("Folder: ${item.title}") }
+                                )
+                            }
+                            null -> {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(iconBaseDp + 24.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -316,6 +374,64 @@ fun HomeScreen(
             )
         }
 
+        // Open Folder Dialog (Matches Spark Launcher in SS 3 & 8)
+        if (openFolder != null) {
+            val folder = openFolder!!
+            Dialog(onDismissRequest = { openFolder = null }) {
+                Card(
+                    shape = RoundedCornerShape(28.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.96f)),
+                    modifier = Modifier
+                        .fillMaxWidth(0.92f)
+                        .padding(12.dp)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(20.dp)
+                    ) {
+                        Text(
+                            text = folder.title,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1E293B)
+                        )
+                        Spacer(modifier = Modifier.height(18.dp))
+
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(4),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            items(folder.apps) { app ->
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            openFolder = null
+                                            onAppClick(app)
+                                        }
+                                        .padding(4.dp)
+                                ) {
+                                    AppIconBadge(app = app, sizeDp = 48.dp, shape = iconShape)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = app.label,
+                                        fontSize = 11.5.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = Color(0xFF1E293B),
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // App Item Long Press Popup
         if (selectedAppForPopup != null) {
             val app = selectedAppForPopup!!
@@ -352,30 +468,51 @@ fun QuickspaceWidget(
     onSongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val dayOfWeekFormat = remember { SimpleDateFormat("EEEE", Locale.getDefault()) }
-    val monthDayFormat = remember { SimpleDateFormat("MMM d", Locale.getDefault()) }
-    val hourMinuteFormat = remember { SimpleDateFormat("h:mm", Locale.getDefault()) }
-    val amPmFormat = remember { SimpleDateFormat("a", Locale.getDefault()) }
-
-    var currentDayOfWeek by remember { mutableStateOf(dayOfWeekFormat.format(Date())) }
-    var currentMonthDay by remember { mutableStateOf(monthDayFormat.format(Date())) }
-    var currentHourMinute by remember { mutableStateOf(hourMinuteFormat.format(Date())) }
-    var currentAmPm by remember { mutableStateOf(amPmFormat.format(Date())) }
+    val fullDateFormat = remember { SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()) }
+    var currentFullDate by remember { mutableStateOf(fullDateFormat.format(Date())) }
+    var currentHour by remember { mutableIntStateOf(Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) }
 
     LaunchedEffect(Unit) {
         while (true) {
             val now = Date()
-            currentDayOfWeek = dayOfWeekFormat.format(now)
-            currentMonthDay = monthDayFormat.format(now)
-            currentHourMinute = hourMinuteFormat.format(now)
-            currentAmPm = amPmFormat.format(now)
+            currentFullDate = fullDateFormat.format(now)
+            currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
             delay(10000L)
+        }
+    }
+
+    val greetingText = remember(currentHour) {
+        when (currentHour) {
+            in 5..11 -> "Good morning."
+            in 12..16 -> "Good afternoon."
+            in 17..20 -> "Good evening."
+            else -> "Good night."
+        }
+    }
+
+    val context = LocalContext.current
+    val statusText = remember(currentHour) {
+        val batteryIntent = try {
+            context.registerReceiver(null, IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+        } catch (e: Exception) { null }
+        val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        val pct = if (level >= 0 && scale > 0) (level * 100 / scale) else -1
+        val status = batteryIntent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val isCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+
+        when {
+            isCharging && pct > 0 -> "⚡ Charging • $pct%"
+            currentHour >= 21 || currentHour < 4 -> "⚡ Remember to full charge me before you sleep."
+            currentHour in 17..20 -> "⚡ Enjoy the night."
+            currentHour in 5..11 -> "⚡ Have a wonderful day ahead."
+            else -> "⚡ Stay inspired and productive."
         }
     }
 
     val widgetShadow = remember {
         Shadow(
-            color = Color.Black.copy(alpha = 0.45f),
+            color = Color.Black.copy(alpha = 0.55f),
             offset = Offset(0f, 2f),
             blurRadius = 8f
         )
@@ -384,147 +521,165 @@ fun QuickspaceWidget(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(
-                indication = null,
-                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-            ) { onSongClick() }
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { onSongClick() })
+            }
             .padding(vertical = 4.dp)
     ) {
+        // Line 1: Time Greeting (Matches Spark Launcher in SS 3 & 8)
+        Text(
+            text = greetingText,
+            color = Color.White,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = (-0.3).sp,
+            style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
+        )
+
+        Spacer(modifier = Modifier.height(3.dp))
+
+        // Line 2: Full Date (e.g. "It's Sunday, September 6")
+        Text(
+            text = "It's $currentFullDate",
+            color = Color.White.copy(alpha = 0.92f),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Normal,
+            style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
+        )
+
+        Spacer(modifier = Modifier.height(3.dp))
+
+        // Line 3: Charging / Night status message
+        Text(
+            text = statusText,
+            color = Color.White.copy(alpha = 0.85f),
+            fontSize = 13.5.sp,
+            fontWeight = FontWeight.Medium,
+            style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
+        )
+
+        // If music is actively playing, show sleek compact Now Playing subline
         if (settings.nowPlaying && nowPlayingTrack.isPlaying && nowPlayingTrack.title.isNotBlank()) {
-            // Sleek Modern Now Playing Pill
+            Spacer(modifier = Modifier.height(10.dp))
             Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = Color.Black.copy(alpha = 0.35f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                shape = RoundedCornerShape(20.dp),
+                color = Color.Black.copy(alpha = 0.4f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .size(38.dp)
-                            .background(Color(0xFFE85D54).copy(alpha = 0.3f), CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MusicNote,
-                            contentDescription = "Now Playing",
-                            tint = Color(0xFFFF8A80),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = nowPlayingTrack.title,
-                            color = Color.White,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
-                        )
-                        if (nowPlayingTrack.artist.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "by ${nowPlayingTrack.artist}",
-                                color = Color.White.copy(alpha = 0.82f),
-                                fontSize = 13.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    // Animated Equalizer Visualizer Bars
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(3.dp),
-                        verticalAlignment = Alignment.Bottom,
-                        modifier = Modifier.height(16.dp)
-                    ) {
-                        Box(modifier = Modifier.width(3.dp).height(10.dp).background(Color(0xFFFF8A80), RoundedCornerShape(2.dp)))
-                        Box(modifier = Modifier.width(3.dp).height(16.dp).background(Color(0xFFFF8A80), RoundedCornerShape(2.dp)))
-                        Box(modifier = Modifier.width(3.dp).height(7.dp).background(Color(0xFFFF8A80), RoundedCornerShape(2.dp)))
-                    }
-                }
-            }
-        } else {
-            // Elegant Pixel-Style At-A-Glance Layout
-            Column(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // Line 1: Date & Weather (Authentic Pixel At-A-Glance Header)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 2.dp)
-                ) {
-                    Text(
-                        text = "$currentDayOfWeek, $currentMonthDay",
-                        color = Color.White,
-                        fontSize = 21.sp,
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = (-0.2).sp,
-                        style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
-                    )
-
-                    if (settings.weatherCondition) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "•",
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 16.sp,
-                            style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(
-                            imageVector = Icons.Outlined.WbSunny,
-                            contentDescription = "Weather",
-                            tint = Color(0xFFFFD54F),
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = if (settings.detailedWeather) {
-                                if (settings.currentCity) "24°C Sunny, New York" else "24°C Sunny"
-                            } else {
-                                if (settings.currentCity) "24°C, New York" else "24°C"
-                            },
-                            color = Color.White.copy(alpha = 0.95f),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Normal,
-                            style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
-                        )
-                    }
-                }
-
-                // Line 2: Subtle Time & Status Bar
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 2.dp)
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Outlined.Schedule,
-                        contentDescription = "Clock",
-                        tint = Color.White.copy(alpha = 0.8f),
-                        modifier = Modifier.size(14.dp)
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = "Playing",
+                        tint = Color(0xFFFF8A80),
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(5.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "$currentHourMinute $currentAmPm",
-                        color = Color.White.copy(alpha = 0.85f),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Normal,
-                        style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
+                        text = if (nowPlayingTrack.artist.isNotBlank()) "${nowPlayingTrack.title} • ${nowPlayingTrack.artist}" else nowPlayingTrack.title,
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                        verticalAlignment = Alignment.Bottom,
+                        modifier = Modifier.height(12.dp)
+                    ) {
+                        Box(modifier = Modifier.width(2.5.dp).height(8.dp).background(Color(0xFFFF8A80), RoundedCornerShape(1.dp)))
+                        Box(modifier = Modifier.width(2.5.dp).height(12.dp).background(Color(0xFFFF8A80), RoundedCornerShape(1.dp)))
+                        Box(modifier = Modifier.width(2.5.dp).height(5.dp).background(Color(0xFFFF8A80), RoundedCornerShape(1.dp)))
+                    }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun DesktopFolderIcon(
+    title: String,
+    apps: List<AppItem>,
+    iconSizeDp: androidx.compose.ui.unit.Dp,
+    fontSizeSp: androidx.compose.ui.unit.TextUnit,
+    showLabel: Boolean,
+    maxLines: Int,
+    iconShape: Shape = CircleShape,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
+            .padding(vertical = 4.dp)
+    ) {
+        // Frosted Translucent Circle Container matching Spark Launcher (Screenshot 3 & 8)
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(iconSizeDp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.28f))
+                .border(1.dp, Color.White.copy(alpha = 0.40f), CircleShape)
+                .padding(6.dp)
+        ) {
+            val miniSize = (iconSizeDp.value * 0.35f).dp
+            val displayApps = apps.take(4)
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    displayApps.getOrNull(0)?.let {
+                        AppIconBadge(app = it, sizeDp = miniSize, shape = CircleShape)
+                    } ?: Box(modifier = Modifier.size(miniSize))
+                    displayApps.getOrNull(1)?.let {
+                        AppIconBadge(app = it, sizeDp = miniSize, shape = CircleShape)
+                    } ?: Box(modifier = Modifier.size(miniSize))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    displayApps.getOrNull(2)?.let {
+                        AppIconBadge(app = it, sizeDp = miniSize, shape = CircleShape)
+                    } ?: Box(modifier = Modifier.size(miniSize))
+                    displayApps.getOrNull(3)?.let {
+                        AppIconBadge(app = it, sizeDp = miniSize, shape = CircleShape)
+                    } ?: Box(modifier = Modifier.size(miniSize))
+                }
+            }
+        }
+
+        if (showLabel) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = title,
+                color = Color.White,
+                fontSize = fontSizeSp,
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                maxLines = maxLines,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 13.sp,
+                modifier = Modifier.padding(horizontal = 2.dp)
+            )
         }
     }
 }

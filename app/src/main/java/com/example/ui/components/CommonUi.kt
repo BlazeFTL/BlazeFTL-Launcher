@@ -48,8 +48,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import com.example.util.IconUtils
 
 val SettingsBgColor = Color(0xFFF9F1EC)
@@ -419,3 +425,58 @@ fun AppIconBadge(
         }
     }
 }
+
+@Composable
+fun GoogleLensIcon(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val stroke = w * 0.16f
+        val halfStroke = stroke / 2f
+        val cornerRadius = w * 0.28f
+
+        // Top-Left: Red (#EA4335)
+        val pathTL = Path().apply {
+            moveTo(w * 0.40f, halfStroke)
+            lineTo(cornerRadius, halfStroke)
+            quadraticTo(halfStroke, halfStroke, halfStroke, cornerRadius)
+            lineTo(halfStroke, h * 0.40f)
+        }
+        drawPath(pathTL, Color(0xFFEA4335), style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+        // Top-Right: Yellow / Orange (#FBBC04)
+        val pathTR = Path().apply {
+            moveTo(w * 0.60f, halfStroke)
+            lineTo(w - cornerRadius, halfStroke)
+            quadraticTo(w - halfStroke, halfStroke, w - halfStroke, cornerRadius)
+            lineTo(w - halfStroke, h * 0.40f)
+        }
+        drawPath(pathTR, Color(0xFFFBBC04), style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+        // Bottom-Right: Blue (#4285F4)
+        val pathBR = Path().apply {
+            moveTo(w - halfStroke, h * 0.60f)
+            lineTo(w - halfStroke, h - cornerRadius)
+            quadraticTo(w - halfStroke, h - halfStroke, w - cornerRadius, h - halfStroke)
+            lineTo(w * 0.60f, h - halfStroke)
+        }
+        drawPath(pathBR, Color(0xFF4285F4), style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+        // Bottom-Left: Green (#34A853)
+        val pathBL = Path().apply {
+            moveTo(w * 0.40f, h - halfStroke)
+            lineTo(cornerRadius, h - halfStroke)
+            quadraticTo(halfStroke, h - halfStroke, halfStroke, h - cornerRadius)
+            lineTo(halfStroke, h * 0.60f)
+        }
+        drawPath(pathBL, Color(0xFF34A853), style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+
+        // Center: Blue circle
+        drawCircle(
+            color = Color(0xFF4285F4),
+            radius = w * 0.17f,
+            center = Offset(w / 2f, h / 2f)
+        )
+    }
+}
+

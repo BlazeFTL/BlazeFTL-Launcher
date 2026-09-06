@@ -92,6 +92,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.model.AppItem
 import com.example.model.LauncherSettings
 import com.example.ui.components.AppIconBadge
+import com.example.ui.components.GoogleLensIcon
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -232,7 +233,7 @@ fun AppDrawerScreen(
                 )
             }
 
-            // Top Search Bar (Matches SS 1 & Blaze Launcher)
+            // Top Search Bar (Matches Spark Launcher in SS 5)
             if (settings.appSearchBar) {
                 Surface(
                     shape = RoundedCornerShape(26.dp),
@@ -298,48 +299,13 @@ fun AppDrawerScreen(
                             onClick = { onShowToast("Google Lens Vision Search") },
                             modifier = Modifier.size(32.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = "Lens",
-                                tint = Color(0xFFEA4335),
-                                modifier = Modifier.size(20.dp)
-                            )
+                            GoogleLensIcon(modifier = Modifier.size(20.dp))
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
-
-            // App Count / Status info Header (e.g. 153 apps   A - Z)
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 2.dp)
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures { _, dragAmount ->
-                            if (dragAmount > 8f) {
-                                onCloseDrawer()
-                            }
-                        }
-                    }
-            ) {
-                Text(
-                    text = "${filteredApps.size} apps",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = headerTextColor
-                )
-
-                Text(
-                    text = "A - Z",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = headerTextColor
-                )
-            }
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Calculations for Dynamic Sizing & Grid Settings (Allows up to 7x10)
             val gridColumns = settings.drawerGridColumns.coerceIn(3, 7)

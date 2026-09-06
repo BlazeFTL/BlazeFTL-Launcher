@@ -282,19 +282,24 @@ class AppRepository(private val context: Context) {
             }
         }
 
-        // If in preview with no resolved apps, fallback to basic curated dock apps without duplicates
-        if (dockList.isEmpty()) {
-            dockList.addAll(
-                listOf(
-                    AppItem("com.android.dialer", label = "Phone", iconVector = Icons.Default.Phone, iconColor = 0xFF2196F3),
-                    AppItem("com.android.messaging", label = "Messages", iconVector = Icons.Outlined.Chat, iconColor = 0xFF4CAF50),
-                    AppItem("com.android.chrome", label = "Browser", iconVector = Icons.Default.Language, iconColor = 0xFFFF7043),
-                    AppItem("com.android.camera2", label = "Camera", iconVector = Icons.Default.CameraAlt, iconColor = 0xFFE91E63)
-                )
-            )
+        // If in preview with no resolved apps or fewer than 6, fallback to curated dock apps matching Spark Launcher
+        val fallbackCandidates = listOf(
+            AppItem("com.google.android.dialer", label = "Phone", iconVector = Icons.Default.Phone, iconColor = 0xFF2196F3),
+            AppItem("com.google.android.apps.messaging", label = "Messages", iconVector = Icons.Outlined.Chat, iconColor = 0xFF4CAF50),
+            AppItem("com.google.android.apps.photos", label = "Gallery", iconVector = Icons.Outlined.Image, iconColor = 0xFF26A69A),
+            AppItem("org.mozilla.firefox", label = "Firefox", iconVector = Icons.Default.Language, iconColor = 0xFFFF5722),
+            AppItem("com.android.chrome", label = "Chrome", iconVector = Icons.Default.Language, iconColor = 0xFF9C27B0),
+            AppItem("com.android.camera2", label = "Camera", iconVector = Icons.Default.CameraAlt, iconColor = 0xFFE91E63)
+        )
+
+        for (candidate in fallbackCandidates) {
+            if (dockList.size >= 6) break
+            if (dockList.none { it.packageName == candidate.packageName }) {
+                dockList.add(candidate)
+            }
         }
 
-        return dockList.distinctBy { it.packageName }
+        return dockList.distinctBy { it.packageName }.take(6)
     }
 
     fun getHomeScreenApps(): List<AppItem> {
@@ -309,16 +314,84 @@ class AppRepository(private val context: Context) {
         )
     }
 
-    fun getHomeScreenDefaultSlots(): List<String?> {
-        // Exact 6-column layout matching Reference Screenshot 2:
-        // Row 0: Slack (0), gaps (1-4), Termux (5)
-        // Row 1: TeriX (6), gaps (7-10), LastChat (11)
-        // Row 2: Bypass Empire (12), gap (13), My Teletalk (14), gaps (15-17)
-        return listOf(
-            "com.Slack", null, null, null, null, "com.termux",
-            "com.terix", null, null, null, null, "com.lastchat",
-            "com.bypassempire", null, "com.myteletalk", null, null, null
+    fun getHomeScreenDefaultSlots(availableApps: List<AppItem> = emptyList()): List<String?> {
+        // Target 18 slots matching Spark Launcher (Reference Screenshot 3 & 8)
+        // Row 1: MM, IDM+, MX Player Pro, Bdix, Lite, Greenify
+        // Row 2: Maps, Messenger, AyuGram, Bdix ByPass, Lemur Browser, Gallery
+        // Row 3: Ai Slop (Folder), Xodo, YouTube, My Robi, Play Store, Settings
+        val targetOrder = listOf(
+            "com.topjohnwu.magisk",
+            "idm.internet.download.manager",
+            "com.mxtech.videoplayer.pro",
+            "com.bdix.tv",
+            "com.facebook.lite",
+            "com.oasisfeng.greenify",
+            "com.google.android.apps.maps",
+            "com.facebook.orca",
+            "org.ayugram",
+            "com.bdix.bypass",
+            "com.lemur.browser",
+            "com.google.android.gallery",
+            "__FOLDER_AI_SLOP__",
+            "com.xodo.pdf.reader",
+            "com.google.android.youtube",
+            "com.robi.myrobi",
+            "com.android.vending",
+            "com.android.settings"
         )
+
+        val defaultAiFolderString = "folder:Ai Slop:com.openai.chatgpt|com.anthropic.claude|com.google.android.apps.bard|com.deepseek.chat"
+
+        if (availableApps.isEmpty()) {
+            return targetOrder.map { pkg ->
+                if (pkg == "__FOLDER_AI_SLOP__") defaultAiFolderString else pkg
+            }
+        }
+
+        val availablePackages = availableApps.map { it.packageName }.toSet()
+        val dockPackages = getDockApps().map { it.packageName }.toSet()
+
+        val aiCandidates = listOf(
+            "com.openai.chatgpt", "com.anthropic.claude", "com.google.android.apps.bard",
+            "com.deepseek.chat", "com.kimi.moonshot", "com.aihub"
+        )
+        val installedAi = aiCandidates.filter { it in availablePackages }
+        val aiFolderString = if (installedAi.isNotEmpty()) {
+            "folder:Ai Slop:${installedAi.joinToString("|")}"
+        } else {
+            defaultAiFolderString
+        }
+
+        val usedPackages = mutableSetOf<String>()
+        usedPackages.addAll(dockPackages)
+
+        val resultSlots = mutableListOf<String?>()
+        val remainingApps = availableApps.map { it.packageName }
+            .filter { it !in dockPackages }
+            .toMutableList()
+
+        for (pkg in targetOrder) {
+            if (pkg == "__FOLDER_AI_SLOP__") {
+                resultSlots.add(aiFolderString)
+            } else if (pkg in availablePackages && pkg !in usedPackages) {
+                resultSlots.add(pkg)
+                usedPackages.add(pkg)
+                remainingApps.remove(pkg)
+            } else {
+                // If the target app is not installed, fill with another installed app to avoid ugly empty holes
+                val replacement = remainingApps.firstOrNull { it !in usedPackages }
+                if (replacement != null) {
+                    resultSlots.add(replacement)
+                    usedPackages.add(replacement)
+                    remainingApps.remove(replacement)
+                } else {
+                    // Fallback to target pkg so preview displays it
+                    resultSlots.add(pkg)
+                }
+            }
+        }
+
+        return resultSlots.take(18)
     }
 
     private fun getCuratedApps(): List<AppItem> {
@@ -340,6 +413,8 @@ class AppRepository(private val context: Context) {
             Triple("com.bangla.dict", "Bangla Dicti...", 0xFF1565C0),
             Triple("com.bdalljob", "BdAllJob", 0xFF43A047),
             Triple("com.bdjobs", "Bdjobs", 0xFF2E7D32),
+            Triple("com.bdix.tv", "Bdix", 0xFF1E88E5),
+            Triple("com.bdix.bypass", "Bdix ByPass", 0xFF795548),
             Triple("com.bkash", "bKash", 0xFFE91E63),
             Triple("com.byebyedpi", "ByeByeDPI", 0xFF0288D1),
             Triple("com.bypassempire", "Bypass Empire", 0xFF795548),
@@ -408,6 +483,8 @@ class AppRepository(private val context: Context) {
             Triple("com.microsoft.office.officehubrow", "Microsoft 365", 0xFFD83B01),
             Triple("com.mixplorer", "Mixplorer", 0xFF37474F),
             Triple("com.flyersoft.moonreader", "Moon Reader", 0xFF5D4037),
+            Triple("com.topjohnwu.magisk", "MM", 0xFF00796B),
+            Triple("com.mxtech.videoplayer.pro", "MX Player Pro", 0xFF0084FF),
             Triple("com.mxtech.videoplayer.ad", "MX Player", 0xFF0084FF),
             Triple("com.netflix.mediaclient", "Netflix", 0xFFE50914),
             Triple("notion.id", "Notion", 0xFF000000),
@@ -428,6 +505,7 @@ class AppRepository(private val context: Context) {
             Triple("ch.protonmail.android", "Proton Mail", 0xFF6D4AFF),
             Triple("ch.protonvpn.android", "Proton VPN", 0xFF6D4AFF),
             Triple("com.sika524.android.quickshortcut", "QuickShortcut", 0xFF00ACC1),
+            Triple("com.robi.myrobi", "My Robi", 0xFFE53935),
             Triple("com.reddit.frontpage", "Reddit", 0xFFFF4500),
             Triple("app.revanced.manager.flutter", "ReVanced", 0xFF3B82F6),
             Triple("com.sec.android.app.shealth", "Samsung Health", 0xFF2962FF),
@@ -471,6 +549,7 @@ class AppRepository(private val context: Context) {
             Triple("com.speedtest", "Speedtest", 0xFF141526),
             Triple("com.google.android.keep", "Keep Notes", 0xFFF4B400),
             Triple("com.adobe.reader", "Adobe Acrobat", 0xFFD32F2F),
+            Triple("com.xodo.pdf.reader", "Xodo", 0xFFD32F2F),
             Triple("com.duolingo", "Duolingo", 0xFF58CC02),
             Triple("com.soundcloud.android", "SoundCloud", 0xFFFF5500),
             Triple("com.pinterest.tappit", "Shuffles", 0xFFE60023),

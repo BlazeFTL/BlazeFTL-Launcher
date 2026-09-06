@@ -78,8 +78,8 @@ object IconShapeHelper {
             "Cut Corner" -> CutCornerShape(12.dp)
             "Diagonal Cut" -> CutCornerShape(topStart = 0.dp, topEnd = 16.dp, bottomEnd = 0.dp, bottomStart = 16.dp)
             "Opposite Cut" -> CutCornerShape(topStart = 16.dp, topEnd = 0.dp, bottomEnd = 16.dp, bottomStart = 0.dp)
-            "Arch" -> RoundedCornerShape(topStart = 50.dp, topEnd = 50.dp, bottomEnd = 8.dp, bottomStart = 8.dp)
-            "Bowl" -> RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomEnd = 50.dp, bottomStart = 50.dp)
+            "Arch" -> RoundedCornerShape(topStartPercent = 50, topEndPercent = 50, bottomEndPercent = 15, bottomStartPercent = 15)
+            "Bowl" -> RoundedCornerShape(topStartPercent = 15, topEndPercent = 15, bottomEndPercent = 50, bottomStartPercent = 50)
             "Pill" -> RoundedCornerShape(50)
             "Oval" -> OvalShape
             "Ticket" -> TicketShape

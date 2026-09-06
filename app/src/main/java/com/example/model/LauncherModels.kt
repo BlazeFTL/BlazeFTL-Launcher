@@ -21,6 +21,11 @@ data class AppItem(
     val uniqueKey: String get() = if (activityName.isNotBlank()) "$packageName/$activityName" else packageName
 }
 
+sealed class DesktopItem {
+    data class App(val app: AppItem) : DesktopItem()
+    data class Folder(val id: String = java.util.UUID.randomUUID().toString(), val title: String, val apps: List<AppItem>) : DesktopItem()
+}
+
 data class LauncherSettings(
     // Icons
     val iconPack: String = "Default",
