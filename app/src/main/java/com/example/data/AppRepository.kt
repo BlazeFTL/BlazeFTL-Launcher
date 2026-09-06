@@ -74,7 +74,8 @@ class AppRepository(private val context: Context) {
     }
 
     fun buildInstalledAppDataAsync(scope: CoroutineScope) {
-        scope.launch(Dispatchers.IO) {
+        scope.launch(Dispatchers.Default) {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
             val totalApps = 155
             val prefs = context.getSharedPreferences("spark_launcher_settings", Context.MODE_PRIVATE)
             val hasBuiltInitial = prefs.getBoolean("has_built_initial_icons", false)
@@ -109,7 +110,8 @@ class AppRepository(private val context: Context) {
         return apps
     }
 
-    suspend fun getInstalledApps(): List<AppItem> = withContext(Dispatchers.IO) {
+    suspend fun getInstalledApps(): List<AppItem> = withContext(Dispatchers.Default) {
+        android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
         val packageManager = context.packageManager
         val mainIntent = Intent(Intent.ACTION_MAIN, null).apply {
             addCategory(Intent.CATEGORY_LAUNCHER)
@@ -121,32 +123,26 @@ class AppRepository(private val context: Context) {
             emptyList()
         }
 
-        val chunks = resolveInfos.chunked(16)
-        val deviceApps = chunks.map { chunk ->
-            async(Dispatchers.IO) {
-                chunk.mapNotNull { resolveInfo ->
-                    try {
-                        val packageName = resolveInfo.activityInfo.packageName
-                        if (packageName == context.packageName) return@mapNotNull null
+        val deviceApps = resolveInfos.mapNotNull { resolveInfo ->
+            try {
+                val packageName = resolveInfo.activityInfo.packageName
+                if (packageName == context.packageName) return@mapNotNull null
 
-                        val label = resolveInfo.loadLabel(packageManager).toString()
-                        val iconDrawable = resolveInfo.loadIcon(packageManager)
-                        val iconBitmap = IconUtils.drawableToImageBitmap(iconDrawable, packageName)
-                        AppItem(
-                            packageName = packageName,
-                            activityName = resolveInfo.activityInfo.name,
-                            label = label,
-                            iconDrawable = iconDrawable,
-                            iconBitmap = iconBitmap,
-                            isSystemApp = false
-                        )
-                    } catch (e: Exception) {
-                        null
-                    }
-                }
+                val label = resolveInfo.loadLabel(packageManager).toString()
+                val iconDrawable = resolveInfo.loadIcon(packageManager)
+                val iconBitmap = IconUtils.drawableToImageBitmap(iconDrawable, packageName)
+                AppItem(
+                    packageName = packageName,
+                    activityName = resolveInfo.activityInfo.name,
+                    label = label,
+                    iconDrawable = null, // Free heavy AdaptiveIconDrawable to prevent GC stutter
+                    iconBitmap = iconBitmap,
+                    isSystemApp = false
+                )
+            } catch (e: Exception) {
+                null
             }
-        }.awaitAll().flatten().distinctBy { it.uniqueKey }
-        .sortedBy { it.label.lowercase() }
+        }.distinctBy { it.uniqueKey }.sortedBy { it.label.lowercase() }
 
         val result = if (deviceApps.isNotEmpty()) {
             deviceApps
@@ -627,12 +623,11 @@ class AppRepository(private val context: Context) {
     }
 
     fun isAudioPlaying(): Boolean {
-        return try {
-            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? android.media.AudioManager
-            audioManager?.isMusicActive == true
-        } catch (e: Exception) {
-            false
-        }
+        return getActiveMediaTrack().isPlaying
+    }
+
+    fun getActiveMediaTrack(): com.example.model.NowPlayingTrack {
+        return com.example.service.SparkNotificationListener.getActivePlayingTrack(context)
     }
 
     fun expandQuickSettings(): Boolean {

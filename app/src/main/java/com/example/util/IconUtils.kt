@@ -21,7 +21,7 @@ object IconUtils {
             if (cached != null) return cached
         }
 
-        val targetSize = 144
+        val targetSize = 108
         val bitmap = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && drawable is AdaptiveIconDrawable) {
                 val bmp = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
@@ -66,7 +66,7 @@ object IconUtils {
         val cached = iconCache.get(key)
         if (cached != null) return cached
 
-        val targetSize = 144
+        val targetSize = 108
         val bmp = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {

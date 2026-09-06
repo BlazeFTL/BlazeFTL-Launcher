@@ -102,7 +102,8 @@ fun HomeScreen(
     settings: LauncherSettings,
     homeApps: List<AppItem?>,
     dockApps: List<AppItem>,
-    isMusicPlaying: Boolean = false,
+    allApps: List<AppItem> = emptyList(),
+    nowPlayingTrack: com.example.model.NowPlayingTrack = com.example.model.NowPlayingTrack(),
     onAppClick: (AppItem) -> Unit,
     onOpenDrawer: () -> Unit,
     onOpenRecents: () -> Unit,
@@ -121,15 +122,7 @@ fun HomeScreen(
 ) {
     var showDesktopMenu by remember { mutableStateOf(false) }
     var selectedAppForPopup by remember { mutableStateOf<AppItem?>(null) }
-    var currentSongIndex by remember { mutableIntStateOf(0) }
     val iconShape = remember(settings.iconShape) { IconShapeHelper.getShape(settings.iconShape) }
-
-    val songList = listOf(
-        "Базовый минимум (Slow Version)" to "Sabi - Topic",
-        "Starboy (Aesthetic Remix)" to "The Weeknd",
-        "Midnight City" to "M83",
-        "Nightcall (Synthwave)" to "Kavinsky"
-    )
 
     var totalDragY by remember { mutableStateOf(0f) }
 
@@ -137,17 +130,17 @@ fun HomeScreen(
         modifier = modifier
             .fillMaxSize()
             .draggable(
+                orientation = Orientation.Vertical,
                 state = rememberDraggableState { delta ->
                     totalDragY += delta
                     if (totalDragY < -24f) {
                         totalDragY = 0f
                         onOpenDrawer()
-                    } else if (totalDragY > 50f) {
+                    } else if (totalDragY > 48f) {
                         totalDragY = 0f
                         onExpandQuickSettings()
                     }
                 },
-                orientation = Orientation.Vertical,
                 onDragStopped = { totalDragY = 0f }
             )
             .pointerInput(Unit) {
@@ -191,12 +184,19 @@ fun HomeScreen(
             if (settings.atAGlance) {
                 QuickspaceWidget(
                     settings = settings,
-                    isMusicPlaying = isMusicPlaying,
-                    currentSong = songList[currentSongIndex],
+                    nowPlayingTrack = nowPlayingTrack,
                     onSongClick = {
-                        if (isMusicPlaying) {
-                            currentSongIndex = (currentSongIndex + 1) % songList.size
-                            onShowToast("Track: ${songList[currentSongIndex].first}")
+                        if (nowPlayingTrack.isPlaying) {
+                            if (nowPlayingTrack.packageName.isNotBlank()) {
+                                val musicApp = allApps.find { it.packageName == nowPlayingTrack.packageName }
+                                if (musicApp != null) {
+                                    onAppClick(musicApp)
+                                } else {
+                                    onShowToast("Playing: ${nowPlayingTrack.title}")
+                                }
+                            } else {
+                                onShowToast("Playing: ${nowPlayingTrack.title}")
+                            }
                         } else {
                             onShowToast("Calendar & At-A-Glance")
                         }
@@ -211,11 +211,11 @@ fun HomeScreen(
             val iconScale = (settings.iconSizePercent / 100f).coerceIn(0.5f, 1.5f)
             val iconBaseDp = (48 * iconScale).dp
             val fontSizeSp = (11.5f * (settings.fontSizePercent / 100f)).sp
-            val iconShape = remember(settings.iconShape) { IconShapeHelper.getShape(settings.iconShape) }
 
             if (homeApps.isNotEmpty()) {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(6),
+                    userScrollEnabled = false,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -253,13 +253,6 @@ fun HomeScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(iconBaseDp + 24.dp)
-                                    .pointerInput(index) {
-                                        detectTapGestures(
-                                            onLongPress = {
-                                                showDesktopMenu = true
-                                            }
-                                        )
-                                    }
                             )
                         }
                     }
@@ -355,8 +348,7 @@ fun HomeScreen(
 @Composable
 fun QuickspaceWidget(
     settings: LauncherSettings,
-    isMusicPlaying: Boolean,
-    currentSong: Pair<String, String>,
+    nowPlayingTrack: com.example.model.NowPlayingTrack,
     onSongClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -377,7 +369,7 @@ fun QuickspaceWidget(
             currentMonthDay = monthDayFormat.format(now)
             currentHourMinute = hourMinuteFormat.format(now)
             currentAmPm = amPmFormat.format(now)
-            delay(1000L)
+            delay(10000L)
         }
     }
 
@@ -398,7 +390,7 @@ fun QuickspaceWidget(
             ) { onSongClick() }
             .padding(vertical = 4.dp)
     ) {
-        if (settings.nowPlaying && isMusicPlaying) {
+        if (settings.nowPlaying && nowPlayingTrack.isPlaying && nowPlayingTrack.title.isNotBlank()) {
             // Sleek Modern Now Playing Pill
             Surface(
                 shape = RoundedCornerShape(24.dp),
@@ -428,7 +420,7 @@ fun QuickspaceWidget(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = currentSong.first,
+                            text = nowPlayingTrack.title,
                             color = Color.White,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
@@ -436,15 +428,17 @@ fun QuickspaceWidget(
                             overflow = TextOverflow.Ellipsis,
                             style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "by ${currentSong.second}",
-                            color = Color.White.copy(alpha = 0.82f),
-                            fontSize = 13.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
-                        )
+                        if (nowPlayingTrack.artist.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "by ${nowPlayingTrack.artist}",
+                                color = Color.White.copy(alpha = 0.82f),
+                                fontSize = 13.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = androidx.compose.ui.text.TextStyle(shadow = widgetShadow)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.width(8.dp))

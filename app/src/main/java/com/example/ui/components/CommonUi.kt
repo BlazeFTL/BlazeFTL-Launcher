@@ -357,21 +357,11 @@ fun AppIconBadge(
         IconUtils.getFallbackAppIcon(app.label, app.iconColor)
     }
 
-    // Determine plate background color so non-adaptive apps get white/dark background of that shape
-    val isDarkApp = remember(app.packageName, app.label) {
-        app.packageName.contains("termux", ignoreCase = true) ||
-        app.packageName.contains("adsregex", ignoreCase = true) ||
-        app.label.equals("Termux", ignoreCase = true) ||
-        app.iconColor == 0xFF000000L
-    }
-    val plateBgColor = if (isDarkApp) Color(0xFF18181B) else Color.White
-
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
             .size(sizeDp)
             .clip(shape)
-            .background(if (forceMonochrome) Color(0xFFE2E8F0) else plateBgColor)
     ) {
         if (realBitmap != null) {
             if (forceMonochrome) {
@@ -379,7 +369,7 @@ fun AppIconBadge(
                     bitmap = realBitmap,
                     contentDescription = null,
                     colorFilter = ColorFilter.tint(Color(0xFF1E293B)),
-                    modifier = Modifier.size(sizeDp * 0.65f)
+                    modifier = Modifier.size(sizeDp * 0.72f)
                 )
             } else {
                 Image(

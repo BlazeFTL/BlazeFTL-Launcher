@@ -56,12 +56,12 @@ object IconShapeHelper {
             "Squircle" -> SquircleShape
             "Rounded Square" -> RoundedCornerShape(26)
             "Smooth Square" -> RoundedCornerShape(16)
-            "Teardrop" -> RoundedCornerShape(topStart = 0.dp, topEnd = 30.dp, bottomEnd = 30.dp, bottomStart = 30.dp)
-            "Teardrop Right" -> RoundedCornerShape(topStart = 30.dp, topEnd = 0.dp, bottomEnd = 30.dp, bottomStart = 30.dp)
-            "Teardrop Inverted" -> RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp, bottomEnd = 30.dp, bottomStart = 0.dp)
-            "Pebble" -> RoundedCornerShape(topStart = 32.dp, topEnd = 16.dp, bottomEnd = 32.dp, bottomStart = 16.dp)
-            "Leaf" -> RoundedCornerShape(topStart = 32.dp, topEnd = 6.dp, bottomEnd = 32.dp, bottomStart = 6.dp)
-            "Reverse Leaf" -> RoundedCornerShape(topStart = 6.dp, topEnd = 32.dp, bottomEnd = 6.dp, bottomStart = 32.dp)
+            "Teardrop" -> RoundedCornerShape(topStartPercent = 10, topEndPercent = 50, bottomEndPercent = 50, bottomStartPercent = 50)
+            "Teardrop Right" -> RoundedCornerShape(topStartPercent = 50, topEndPercent = 10, bottomEndPercent = 50, bottomStartPercent = 50)
+            "Teardrop Inverted" -> RoundedCornerShape(topStartPercent = 50, topEndPercent = 50, bottomEndPercent = 50, bottomStartPercent = 10)
+            "Pebble" -> RoundedCornerShape(topStartPercent = 50, topEndPercent = 25, bottomEndPercent = 50, bottomStartPercent = 25)
+            "Leaf" -> RoundedCornerShape(topStartPercent = 50, topEndPercent = 10, bottomEndPercent = 50, bottomStartPercent = 10)
+            "Reverse Leaf" -> RoundedCornerShape(topStartPercent = 10, topEndPercent = 50, bottomEndPercent = 10, bottomStartPercent = 50)
             "Hexagon" -> HexagonShape
             "Octagon" -> OctagonShape
             "Pentagon" -> PentagonShape

@@ -227,11 +227,11 @@ fun SparkLauncherApp(
         }
     }
 
-    var isAudioPlaying by remember { mutableStateOf(false) }
+    var nowPlayingTrack by remember { mutableStateOf(com.example.model.NowPlayingTrack()) }
 
     LaunchedEffect(Unit) {
         while (true) {
-            isAudioPlaying = appRepo.isAudioPlaying()
+            nowPlayingTrack = appRepo.getActiveMediaTrack()
             kotlinx.coroutines.delay(2000L)
         }
     }
@@ -420,10 +420,10 @@ fun SparkLauncherApp(
     )
 
     val view = LocalView.current
-    val isLightDrawerScrim = drawerProgress > 0.5f && settings.drawerBackgroundOpacity >= 40
-    SideEffect {
+    LaunchedEffect(isDrawerOpen, settings.drawerBackgroundOpacity) {
         val window = (view.context as? ComponentActivity)?.window
         if (window != null) {
+            val isLightDrawerScrim = isDrawerOpen && settings.drawerBackgroundOpacity >= 40
             val insetsController = WindowCompat.getInsetsController(window, view)
             insetsController.isAppearanceLightStatusBars = isLightDrawerScrim
             insetsController.isAppearanceLightNavigationBars = isLightDrawerScrim
@@ -435,61 +435,61 @@ fun SparkLauncherApp(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Base Home Screen (always mounted, fades cleanly with subtle parallax shift as drawer slides in)
-        if (drawerProgress < 0.999f) {
-            HomeScreen(
-                settings = settings,
-                homeApps = homeAppsList,
-                dockApps = dockApps,
-                isMusicPlaying = isAudioPlaying,
-                onAppClick = { handleAppClick(it) },
-                onOpenDrawer = { currentScreen = LauncherScreen.APP_DRAWER },
-                onOpenRecents = {
-                    memoryInfoText = appRepo.getFormattedMemoryInfo()
-                    currentScreen = LauncherScreen.RECENTS_OVERVIEW
-                },
-                onOpenSettings = { currentScreen = LauncherScreen.SETTINGS_MAIN },
-                onOpenWallpaper = { appRepo.openWallpaperPicker() },
-                onOpenAppInfo = { appRepo.openAppInfo(it) },
-                onUninstallApp = { appRepo.uninstallApp(it) },
-                onRemoveFromHome = { removeAppFromHomeScreen(it) },
-                onFillEmptySpaces = fillEmptySpaces,
-                onRearrangeByName = rearrangeByName,
-                onRearrangeByType = rearrangeByType,
-                onResetToSS2Layout = resetToSS2Layout,
-                onExpandQuickSettings = { appRepo.expandQuickSettings() },
-                onShowToast = { showToast(it) },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        alpha = (1f - drawerProgress * 1.5f).coerceIn(0f, 1f)
-                        translationY = -drawerProgress * 100f
-                        scaleX = 1f - (drawerProgress * 0.04f)
-                        scaleY = 1f - (drawerProgress * 0.04f)
-                    }
-            )
-        }
+        // Base Home Screen (smoothly fades with GPU-accelerated graphicsLayer)
+        HomeScreen(
+            settings = settings,
+            homeApps = homeAppsList,
+            dockApps = dockApps,
+            allApps = installedApps,
+            nowPlayingTrack = nowPlayingTrack,
+            onAppClick = { handleAppClick(it) },
+            onOpenDrawer = { currentScreen = LauncherScreen.APP_DRAWER },
+            onOpenRecents = {
+                memoryInfoText = appRepo.getFormattedMemoryInfo()
+                currentScreen = LauncherScreen.RECENTS_OVERVIEW
+            },
+            onOpenSettings = { currentScreen = LauncherScreen.SETTINGS_MAIN },
+            onOpenWallpaper = { appRepo.openWallpaperPicker() },
+            onOpenAppInfo = { appRepo.openAppInfo(it) },
+            onUninstallApp = { appRepo.uninstallApp(it) },
+            onRemoveFromHome = { removeAppFromHomeScreen(it) },
+            onFillEmptySpaces = fillEmptySpaces,
+            onRearrangeByName = rearrangeByName,
+            onRearrangeByType = rearrangeByType,
+            onResetToSS2Layout = resetToSS2Layout,
+            onExpandQuickSettings = { appRepo.expandQuickSettings() },
+            onShowToast = { showToast(it) },
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    alpha = (1f - drawerProgress * 1.4f).coerceIn(0f, 1f)
+                    translationY = -drawerProgress * 80f
+                    scaleX = 1f - (drawerProgress * 0.03f)
+                    scaleY = 1f - (drawerProgress * 0.03f)
+                }
+        )
 
-        // Fullscreen Translucent Scrim over system wallpaper (matches Reference Screenshots)
+        // Fullscreen Translucent Scrim over system wallpaper (GPU-accelerated RenderNode)
         val overlayAlpha = (settings.drawerBackgroundOpacity / 100f).coerceIn(0f, 1f)
-        if (drawerProgress > 0.001f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFFE2E7EC).copy(alpha = overlayAlpha * drawerProgress))
-            )
-        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    alpha = (overlayAlpha * drawerProgress).coerceIn(0f, 1f)
+                }
+                .background(Color(0xFFE2E7EC))
+        )
 
-        // App Drawer Sliding Overlay (Pre-composed off-screen so drawer glides up with 0 frame drops)
-        if (drawerProgress > 0.001f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        translationY = (1f - drawerProgress) * size.height
-                        alpha = (drawerProgress * 1.5f).coerceIn(0f, 1f)
-                    }
-            ) {
+        // App Drawer Sliding Overlay
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    translationY = (1f - drawerProgress) * size.height
+                    alpha = if (drawerProgress <= 0.001f) 0f else 1f
+                }
+        ) {
+            if (drawerProgress > 0.001f || isDrawerOpen) {
                 AppDrawerScreen(
                     settings = settings,
                     allApps = visibleDrawerApps,
